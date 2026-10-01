@@ -7,13 +7,13 @@ from registry.ingestion.storage import ensure_bucket, get_s3_client, upload_file
 
 
 def test_get_s3_client_uses_env_configuration(monkeypatch):
-    monkeypatch.setenv("MINIO_ENDPOINT_URL", "http://localhost:9000")
-    monkeypatch.setenv("MINIO_ACCESS_KEY", "test-key")
-    monkeypatch.setenv("MINIO_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("S3_ENDPOINT_URL", "http://localhost:3900")
+    monkeypatch.setenv("S3_ACCESS_KEY", "test-key")
+    monkeypatch.setenv("S3_SECRET_KEY", "test-secret")
 
     client = get_s3_client()
 
-    assert client.meta.endpoint_url == "http://localhost:9000"
+    assert client.meta.endpoint_url == "http://localhost:3900"
 
 
 @mock_aws
