@@ -216,8 +216,20 @@ def test_clean_sirene_bronze_types_and_renames_columns(spark_session):
     raw_df = spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", "1966-01-01", "true",
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", "2023-05-12",
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                "1966-01-01",
+                "true",
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                "2023-05-12",
             )
         ],
         schema=BRONZE_SCHEMA,
@@ -235,12 +247,36 @@ def test_clean_sirene_bronze_drops_rows_with_missing_siret(spark_session):
     raw_df = spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", "1966-01-01", "true",
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", "2023-05-12",
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                "1966-01-01",
+                "true",
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                "2023-05-12",
             ),
             (
-                "732829320", "00014", "", "O", "1994-03-15", "false",
-                "12", "AV", "DES CHAMPS ELYSEES", "75008", "PARIS", "46.19B", "A", "2022-11-03",
+                "732829320",
+                "00014",
+                "",
+                "O",
+                "1994-03-15",
+                "false",
+                "12",
+                "AV",
+                "DES CHAMPS ELYSEES",
+                "75008",
+                "PARIS",
+                "46.19B",
+                "A",
+                "2022-11-03",
             ),
         ],
         schema=BRONZE_SCHEMA,
@@ -324,8 +360,20 @@ def test_bronze_to_silver_writes_cleaned_iceberg_table(spark_session, tmp_path, 
     bronze_df = spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", "1966-01-01", "true",
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", "2023-05-12",
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                "1966-01-01",
+                "true",
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                "2023-05-12",
             )
         ],
         schema=BRONZE_SCHEMA,
@@ -492,8 +540,20 @@ def test_apply_scd2_merge_inserts_new_establishments(spark_session, table_suffix
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2023, 5, 12),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -616,8 +676,20 @@ def test_apply_scd2_merge_closes_and_versions_changed_establishment(spark_sessio
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2023, 5, 12),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -627,8 +699,20 @@ def test_apply_scd2_merge_closes_and_versions_changed_establishment(spark_sessio
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "10", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2026, 9, 30),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "10",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2026, 9, 30),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -689,14 +773,30 @@ def test_apply_scd2_merge_does_not_version_unchanged_establishment(spark_session
     silver_table = f"lakehouse.silver.sirene_{table_suffix}"
     ensure_gold_table(spark_session, gold_table)
     row = (
-        "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-        "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+        "552032534",
+        "00019",
+        "55203253400019",
+        "O",
+        dt.date(1966, 1, 1),
+        True,
+        "8",
+        "RUE",
+        "DE LA PAIX",
+        "75002",
+        "PARIS",
+        "70.10Z",
+        "A",
+        dt.date(2023, 5, 12),
     )
 
-    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(silver_table).createOrReplace()
+    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(
+        silver_table
+    ).createOrReplace()
     apply_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 1))
 
-    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(silver_table).createOrReplace()
+    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(
+        silver_table
+    ).createOrReplace()
     apply_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 2))
 
     rows = spark_session.table(gold_table).collect()
@@ -748,8 +848,20 @@ def test_silver_to_gold_creates_table_and_merges(spark_session, table_suffix):
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2023, 5, 12),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -891,8 +1003,8 @@ git commit -m "feat: add production Spark session factory for the Garage lakehou
 - [ ] **Step 1: Run the full test suite**
 
 Run: `uv run pytest -v`
-Expected: all tests pass — 7 from Plan 1 plus 11 new ones from this plan (1 smoke +
-2 + 1 + 1 + 1 + 1 + 1 + 1 + 1 across Tasks 1-9) = 18 total.
+Expected: all tests pass — 7 from Plan 1 plus 10 new ones from this plan (1 smoke +
+2 + 1 + 1 + 1 + 1 + 1 + 1 + 1 across Tasks 1-9) = 17 total.
 
 - [ ] **Step 2: Run lint and format check**
 

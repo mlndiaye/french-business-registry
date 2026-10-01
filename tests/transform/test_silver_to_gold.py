@@ -40,8 +40,20 @@ def test_apply_scd2_merge_inserts_new_establishments(spark_session, table_suffix
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2023, 5, 12),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -65,8 +77,20 @@ def test_apply_scd2_merge_closes_and_versions_changed_establishment(spark_sessio
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2023, 5, 12),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -76,8 +100,20 @@ def test_apply_scd2_merge_closes_and_versions_changed_establishment(spark_sessio
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "10", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2026, 9, 30),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "10",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2026, 9, 30),
             )
         ],
         schema=SILVER_SCHEMA,
@@ -99,14 +135,30 @@ def test_apply_scd2_merge_does_not_version_unchanged_establishment(spark_session
     silver_table = f"lakehouse.silver.sirene_{table_suffix}"
     ensure_gold_table(spark_session, gold_table)
     row = (
-        "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-        "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+        "552032534",
+        "00019",
+        "55203253400019",
+        "O",
+        dt.date(1966, 1, 1),
+        True,
+        "8",
+        "RUE",
+        "DE LA PAIX",
+        "75002",
+        "PARIS",
+        "70.10Z",
+        "A",
+        dt.date(2023, 5, 12),
     )
 
-    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(silver_table).createOrReplace()
+    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(
+        silver_table
+    ).createOrReplace()
     apply_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 1))
 
-    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(silver_table).createOrReplace()
+    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(
+        silver_table
+    ).createOrReplace()
     apply_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 2))
 
     rows = spark_session.table(gold_table).collect()
@@ -121,8 +173,20 @@ def test_silver_to_gold_creates_table_and_merges(spark_session, table_suffix):
     spark_session.createDataFrame(
         [
             (
-                "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+                "552032534",
+                "00019",
+                "55203253400019",
+                "O",
+                dt.date(1966, 1, 1),
+                True,
+                "8",
+                "RUE",
+                "DE LA PAIX",
+                "75002",
+                "PARIS",
+                "70.10Z",
+                "A",
+                dt.date(2023, 5, 12),
             )
         ],
         schema=SILVER_SCHEMA,
