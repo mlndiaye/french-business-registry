@@ -15,3 +15,4 @@ def test_lakehouse_spark_configs_sets_s3a_and_iceberg_catalog(monkeypatch):
     assert configs["spark.hadoop.fs.s3a.endpoint.region"] == "garage"
     assert configs["spark.hadoop.fs.s3a.access.key"] == "test-key"
     assert configs["spark.hadoop.fs.s3a.secret.key"] == "test-secret"
+    assert configs["spark.hadoop.fs.s3a.multiobjectdelete.enable"] == "false"

@@ -26,6 +26,7 @@ def lakehouse_spark_configs() -> dict[str, str]:
         "spark.hadoop.fs.s3a.path.style.access": "true",
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
         "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+        "spark.hadoop.fs.s3a.multiobjectdelete.enable": "false",
     }
 
 

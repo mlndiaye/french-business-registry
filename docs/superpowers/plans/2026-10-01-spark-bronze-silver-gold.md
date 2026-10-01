@@ -937,6 +937,7 @@ def test_lakehouse_spark_configs_sets_s3a_and_iceberg_catalog(monkeypatch):
     assert configs["spark.hadoop.fs.s3a.endpoint.region"] == "garage"
     assert configs["spark.hadoop.fs.s3a.access.key"] == "test-key"
     assert configs["spark.hadoop.fs.s3a.secret.key"] == "test-secret"
+    assert configs["spark.hadoop.fs.s3a.multiobjectdelete.enable"] == "false"
 ```
 
 **Note (post-implementation):** the manual verification in Task 11 initially failed
@@ -947,6 +948,15 @@ default `us-east-1` region while Garage is configured with `s3_region = "garage"
 Fixed by explicitly setting `spark.hadoop.fs.s3a.endpoint.region` from `S3_REGION`
 (Hadoop 3.3.2+ added this property specifically for non-AWS S3-compatible endpoints,
 where the SDK cannot infer the signing region from the hostname).
+
+A second issue surfaced after that fix: writing the silver Iceberg table hung for
+~20 minutes in a retry loop logging `MultiObjectDeleteSupport: Bulk delete operation
+failed to delete all objects`, eventually killing the executor (heartbeat timeout).
+Garage's bulk/multi-object `DELETE` endpoint doesn't behave identically to AWS S3's,
+which S3A's directory-marker cleanup relies on. Fixed by setting
+`spark.hadoop.fs.s3a.multiobjectdelete.enable = false`, which makes S3A issue
+individual `DELETE` calls instead — slower per-call but broadly compatible across
+S3-compatible backends.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -984,6 +994,7 @@ def lakehouse_spark_configs() -> dict[str, str]:
         "spark.hadoop.fs.s3a.path.style.access": "true",
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
         "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+        "spark.hadoop.fs.s3a.multiobjectdelete.enable": "false",
     }
 
 
