@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
@@ -23,3 +24,8 @@ def ensure_bucket(client, bucket: str) -> None:
         client.head_bucket(Bucket=bucket)
     except ClientError:
         client.create_bucket(Bucket=bucket)
+
+
+def upload_file(client, local_path: Path, bucket: str, key: str) -> None:
+    ensure_bucket(client, bucket)
+    client.upload_file(str(local_path), bucket, key)
