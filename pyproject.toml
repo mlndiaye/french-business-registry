@@ -1,0 +1,36 @@
+[project]
+name = "french-business-registry"
+version = "0.1.0"
+description = "Multi-source ELT platform unifying French public business data into a historized registry"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.34",
+    "pyarrow>=16.0",
+    "requests>=2.31",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "moto[s3]>=5.0",
+    "responses>=0.25",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/registry"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
