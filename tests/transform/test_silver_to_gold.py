@@ -92,3 +92,24 @@ def test_apply_scd2_merge_closes_and_versions_changed_establishment(spark_sessio
     assert rows[1].numero_voie == "10"
     assert rows[1].is_current is True
     assert rows[1].valid_to is None
+
+
+def test_apply_scd2_merge_does_not_version_unchanged_establishment(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.sirene_{table_suffix}"
+    silver_table = f"lakehouse.silver.sirene_{table_suffix}"
+    ensure_gold_table(spark_session, gold_table)
+    row = (
+        "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
+        "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
+    )
+
+    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(silver_table).createOrReplace()
+    apply_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 1))
+
+    spark_session.createDataFrame([row], schema=SILVER_SCHEMA).writeTo(silver_table).createOrReplace()
+    apply_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 2))
+
+    rows = spark_session.table(gold_table).collect()
+    assert len(rows) == 1
+    assert rows[0].is_current is True
+    assert rows[0].valid_from == dt.date(2026, 10, 1)
