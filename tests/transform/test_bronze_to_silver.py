@@ -1,4 +1,4 @@
-from registry.transform.bronze_to_silver import clean_sirene_bronze
+from registry.transform.bronze_to_silver import bronze_to_silver, clean_sirene_bronze
 
 BRONZE_SCHEMA = [
     "siren",
@@ -55,3 +55,24 @@ def test_clean_sirene_bronze_drops_rows_with_missing_siret(spark_session):
     result = clean_sirene_bronze(raw_df).collect()
 
     assert [row.siret for row in result] == ["55203253400019"]
+
+
+def test_bronze_to_silver_writes_cleaned_iceberg_table(spark_session, tmp_path, table_suffix):
+    bronze_df = spark_session.createDataFrame(
+        [
+            (
+                "552032534", "00019", "55203253400019", "O", "1966-01-01", "true",
+                "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", "2023-05-12",
+            )
+        ],
+        schema=BRONZE_SCHEMA,
+    )
+    bronze_path = str(tmp_path / "bronze_stock.parquet")
+    bronze_df.write.parquet(bronze_path)
+    silver_table = f"lakehouse.silver.sirene_{table_suffix}"
+
+    bronze_to_silver(spark_session, bronze_path, silver_table)
+
+    result = spark_session.table(silver_table).collect()
+    assert len(result) == 1
+    assert result[0].siret == "55203253400019"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 
@@ -29,3 +29,9 @@ def clean_sirene_bronze(df: DataFrame) -> DataFrame:
             ),
         )
     )
+
+
+def bronze_to_silver(spark: SparkSession, bronze_path: str, silver_table: str) -> None:
+    raw_df = spark.read.parquet(bronze_path)
+    clean_df = clean_sirene_bronze(raw_df)
+    clean_df.writeTo(silver_table).createOrReplace()
