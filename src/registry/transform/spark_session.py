@@ -20,6 +20,7 @@ def lakehouse_spark_configs() -> dict[str, str]:
         "spark.sql.catalog.lakehouse.type": "hadoop",
         "spark.sql.catalog.lakehouse.warehouse": f"s3a://{bucket}/warehouse",
         "spark.hadoop.fs.s3a.endpoint": os.environ["S3_ENDPOINT_URL"],
+        "spark.hadoop.fs.s3a.endpoint.region": os.environ.get("S3_REGION", "us-east-1"),
         "spark.hadoop.fs.s3a.access.key": os.environ["S3_ACCESS_KEY"],
         "spark.hadoop.fs.s3a.secret.key": os.environ["S3_SECRET_KEY"],
         "spark.hadoop.fs.s3a.path.style.access": "true",

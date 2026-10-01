@@ -928,14 +928,25 @@ def test_lakehouse_spark_configs_sets_s3a_and_iceberg_catalog(monkeypatch):
     monkeypatch.setenv("S3_ENDPOINT_URL", "http://localhost:3900")
     monkeypatch.setenv("S3_ACCESS_KEY", "test-key")
     monkeypatch.setenv("S3_SECRET_KEY", "test-secret")
+    monkeypatch.setenv("S3_REGION", "garage")
 
     configs = lakehouse_spark_configs()
 
     assert configs["spark.sql.catalog.lakehouse.warehouse"] == "s3a://lakehouse/warehouse"
     assert configs["spark.hadoop.fs.s3a.endpoint"] == "http://localhost:3900"
+    assert configs["spark.hadoop.fs.s3a.endpoint.region"] == "garage"
     assert configs["spark.hadoop.fs.s3a.access.key"] == "test-key"
     assert configs["spark.hadoop.fs.s3a.secret.key"] == "test-secret"
 ```
+
+**Note (post-implementation):** the manual verification in Task 11 initially failed
+with `AWSBadRequestException: Authorization header malformed, unexpected scope:
+.../us-east-1/s3/aws4_request`. The S3A connector was signing requests with the
+default `us-east-1` region while Garage is configured with `s3_region = "garage"`
+(in `garage.toml`) — SigV4 signatures are region-bound, so a mismatch is rejected.
+Fixed by explicitly setting `spark.hadoop.fs.s3a.endpoint.region` from `S3_REGION`
+(Hadoop 3.3.2+ added this property specifically for non-AWS S3-compatible endpoints,
+where the SDK cannot infer the signing region from the hostname).
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -967,6 +978,7 @@ def lakehouse_spark_configs() -> dict[str, str]:
         "spark.sql.catalog.lakehouse.type": "hadoop",
         "spark.sql.catalog.lakehouse.warehouse": f"s3a://{bucket}/warehouse",
         "spark.hadoop.fs.s3a.endpoint": os.environ["S3_ENDPOINT_URL"],
+        "spark.hadoop.fs.s3a.endpoint.region": os.environ.get("S3_REGION", "us-east-1"),
         "spark.hadoop.fs.s3a.access.key": os.environ["S3_ACCESS_KEY"],
         "spark.hadoop.fs.s3a.secret.key": os.environ["S3_SECRET_KEY"],
         "spark.hadoop.fs.s3a.path.style.access": "true",
