@@ -1,4 +1,4 @@
-"""S3-compatible storage helpers for the MinIO-backed data lake."""
+"""S3-compatible storage helpers for the data lake (backend-agnostic: Garage, MinIO, AWS)."""
 
 from __future__ import annotations
 
