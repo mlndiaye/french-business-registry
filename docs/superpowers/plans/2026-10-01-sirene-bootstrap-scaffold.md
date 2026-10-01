@@ -554,9 +554,12 @@ from registry.ingestion.sirene_bootstrap import run_bootstrap
 @responses.activate
 @mock_aws
 def test_run_bootstrap_uploads_parquet_to_bronze(tmp_path: Path, monkeypatch, fixture_csv_path: Path):
-    monkeypatch.setenv("MINIO_ENDPOINT_URL", "http://localhost:9000")
-    monkeypatch.setenv("MINIO_ACCESS_KEY", "test-key")
-    monkeypatch.setenv("MINIO_SECRET_KEY", "test-secret")
+    # moto only intercepts requests to real AWS-style endpoints, not custom ones
+    # like MinIO's, so get_s3_client is swapped for a moto-compatible client here.
+    monkeypatch.setattr(
+        "registry.ingestion.sirene_bootstrap.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
 
     url = "https://example.test/stock.csv"
     responses.add(responses.GET, url, body=fixture_csv_path.read_bytes(), status=200)
@@ -571,6 +574,13 @@ def test_run_bootstrap_uploads_parquet_to_bronze(tmp_path: Path, monkeypatch, fi
 
 Add `import boto3` to the top of `tests/ingestion/test_sirene_bootstrap.py` (needed by
 this test, alongside the existing `pyarrow.parquet as pq` import from Task 6).
+
+**Note:** moto's `mock_aws` only intercepts requests sent to real AWS-style endpoint
+hostnames — it does not intercept custom `endpoint_url`s such as MinIO's. Setting
+`MINIO_ENDPOINT_URL` to a local address and letting `get_s3_client()` use it would
+therefore attempt a real (failing) network connection in tests. Patching
+`get_s3_client` itself to return a plain moto-backed client avoids this without
+changing any production code.
 
 - [ ] **Step 2: Run test to verify it fails**
 
