@@ -88,3 +88,10 @@ def apply_scd2_merge(
           ON incoming.siret = gold.siret AND gold.is_current = true
         WHERE gold.siret IS NULL
     """)
+
+
+def silver_to_gold(
+    spark: SparkSession, silver_table: str, gold_table: str, run_date: dt.date
+) -> None:
+    ensure_gold_table(spark, gold_table)
+    apply_scd2_merge(spark, silver_table, gold_table, run_date)
