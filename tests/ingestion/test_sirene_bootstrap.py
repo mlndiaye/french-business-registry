@@ -22,7 +22,9 @@ def test_bronze_object_key_formats_ingestion_date():
     assert key == "bronze/sirene/stock/ingestion_date=2026-10-01/stock.parquet"
 
 
-def test_convert_csv_to_parquet_preserves_all_columns_as_strings(tmp_path: Path, fixture_csv_path: Path):
+def test_convert_csv_to_parquet_preserves_all_columns_as_strings(
+    tmp_path: Path, fixture_csv_path: Path
+):
     parquet_path = tmp_path / "out.parquet"
 
     convert_csv_to_parquet(fixture_csv_path, parquet_path)
@@ -46,7 +48,9 @@ def test_download_sirene_stock_writes_response_body(tmp_path: Path):
 
 @responses.activate
 @mock_aws
-def test_run_bootstrap_uploads_parquet_to_bronze(tmp_path: Path, monkeypatch, fixture_csv_path: Path):
+def test_run_bootstrap_uploads_parquet_to_bronze(
+    tmp_path: Path, monkeypatch, fixture_csv_path: Path
+):
     # moto only intercepts requests to real AWS-style endpoints, not custom ones
     # like MinIO's, so get_s3_client is swapped for a moto-compatible client here.
     monkeypatch.setattr(

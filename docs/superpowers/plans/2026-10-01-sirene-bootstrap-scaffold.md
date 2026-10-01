@@ -416,7 +416,9 @@ import pyarrow.parquet as pq
 from registry.ingestion.sirene_bootstrap import convert_csv_to_parquet
 
 
-def test_convert_csv_to_parquet_preserves_all_columns_as_strings(tmp_path: Path, fixture_csv_path: Path):
+def test_convert_csv_to_parquet_preserves_all_columns_as_strings(
+    tmp_path: Path, fixture_csv_path: Path
+):
     parquet_path = tmp_path / "out.parquet"
 
     convert_csv_to_parquet(fixture_csv_path, parquet_path)
@@ -553,7 +555,9 @@ from registry.ingestion.sirene_bootstrap import run_bootstrap
 
 @responses.activate
 @mock_aws
-def test_run_bootstrap_uploads_parquet_to_bronze(tmp_path: Path, monkeypatch, fixture_csv_path: Path):
+def test_run_bootstrap_uploads_parquet_to_bronze(
+    tmp_path: Path, monkeypatch, fixture_csv_path: Path
+):
     # moto only intercepts requests to real AWS-style endpoints, not custom ones
     # like MinIO's, so get_s3_client is swapped for a moto-compatible client here.
     monkeypatch.setattr(
