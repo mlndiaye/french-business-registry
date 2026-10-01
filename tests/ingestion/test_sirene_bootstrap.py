@@ -3,8 +3,13 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import responses
 
-from registry.ingestion.sirene_bootstrap import bronze_object_key, convert_csv_to_parquet
+from registry.ingestion.sirene_bootstrap import (
+    bronze_object_key,
+    convert_csv_to_parquet,
+    download_sirene_stock,
+)
 
 
 def test_bronze_object_key_formats_ingestion_date():
@@ -22,3 +27,14 @@ def test_convert_csv_to_parquet_preserves_all_columns_as_strings(tmp_path: Path,
     assert table.num_rows == 2
     assert table.column("siren").to_pylist() == ["552032534", "732829320"]
     assert all(field.type == pa.string() for field in table.schema)
+
+
+@responses.activate
+def test_download_sirene_stock_writes_response_body(tmp_path: Path):
+    url = "https://example.test/stock.csv"
+    responses.add(responses.GET, url, body=b"siren,nic\n123,001\n", status=200)
+    dest_path = tmp_path / "stock.csv"
+
+    download_sirene_stock(url, dest_path)
+
+    assert dest_path.read_bytes() == b"siren,nic\n123,001\n"
