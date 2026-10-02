@@ -225,7 +225,16 @@ Append to `.gitignore`:
 .dbt_dev_warehouse/
 dbt/target/
 dbt/logs/
+dbt/.user.yml
+dbt/metastore_db/
+derby.log
 ```
+
+**Note (post-implementation):** `dbt/.user.yml` (dbt's anonymous-usage-tracking
+file) and `dbt/metastore_db/` (the embedded Derby metastore `enableHiveSupport()`
+creates at the session's CWD) only appeared after actually running `dbt` commands
+in Task 5 onward — added here so the full list is in one place, even though they
+weren't yet generated at this point in a from-scratch run.
 
 - [ ] **Step 5: Smoke-check the connection**
 
