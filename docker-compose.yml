@@ -18,6 +18,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-registry-db.sql:/docker-entrypoint-initdb.d/init-registry-db.sql:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
