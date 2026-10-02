@@ -2,15 +2,16 @@ import datetime as dt
 import io
 
 import boto3
+import pyarrow.parquet as pq
 import responses
 from moto import mock_aws
-import pyarrow.parquet as pq
 
 from registry.ingestion.sirene_diff import (
     SIRENE_API_URL,
     diff_object_key,
     fetch_sirene_updates,
     normalize_etablissement,
+    run_daily_diff,
     write_diff_to_bronze,
 )
 
@@ -155,3 +156,30 @@ def test_write_diff_to_bronze_uploads_parquet(tmp_path, monkeypatch):
     table = pq.read_table(io.BytesIO(obj["Body"].read()))
     assert table.num_rows == 1
     assert table.column("siret").to_pylist() == ["55203253400019"]
+
+
+@responses.activate
+@mock_aws
+def test_run_daily_diff_fetches_and_uploads_to_bronze(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.ingestion.sirene_diff.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    responses.add(
+        responses.GET,
+        SIRENE_API_URL,
+        json={
+            "header": {"statut": 200, "curseur": "*", "curseurSuivant": "*"},
+            "etablissements": [_etablissement("55203253400019", "99")],
+        },
+        status=200,
+    )
+
+    key = run_daily_diff(
+        "test-api-key", "lakehouse", dt.date(2026, 10, 1), dt.date(2026, 10, 2), tmp_path
+    )
+
+    client = boto3.client("s3", region_name="us-east-1")
+    obj = client.get_object(Bucket="lakehouse", Key=key)
+    table = pq.read_table(io.BytesIO(obj["Body"].read()))
+    assert table.num_rows == 1

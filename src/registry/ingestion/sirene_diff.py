@@ -47,15 +47,9 @@ def normalize_etablissement(raw: dict) -> dict:
         "libelleVoieEtablissement": adresse.get("libelleVoieEtablissement"),
         "codePostalEtablissement": adresse.get("codePostalEtablissement"),
         "libelleCommuneEtablissement": adresse.get("libelleCommuneEtablissement"),
-        "activitePrincipaleEtablissement": periode_courante.get(
-            "activitePrincipaleEtablissement"
-        ),
-        "etatAdministratifEtablissement": periode_courante.get(
-            "etatAdministratifEtablissement"
-        ),
-        "dateDernierTraitementEtablissement": raw.get(
-            "dateDernierTraitementEtablissement"
-        ),
+        "activitePrincipaleEtablissement": periode_courante.get("activitePrincipaleEtablissement"),
+        "etatAdministratifEtablissement": periode_courante.get("etatAdministratifEtablissement"),
+        "dateDernierTraitementEtablissement": raw.get("dateDernierTraitementEtablissement"),
     }
 
 
@@ -100,3 +94,10 @@ def write_diff_to_bronze(records: list[dict], bucket: str, work_dir: Path) -> st
     key = diff_object_key(dt.date.today())
     upload_file(client, parquet_path, bucket, key)
     return key
+
+
+def run_daily_diff(
+    api_key: str, bucket: str, since: dt.date, until: dt.date, work_dir: Path
+) -> str:
+    records = fetch_sirene_updates(api_key, since, until)
+    return write_diff_to_bronze(records, bucket, work_dir)
