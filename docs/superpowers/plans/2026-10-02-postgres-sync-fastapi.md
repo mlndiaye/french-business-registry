@@ -303,8 +303,7 @@ def ensure_postgres_table(dsn: str) -> None:
             )
         """)
         cur.execute(
-            f"CREATE INDEX IF NOT EXISTS idx_{POSTGRES_TABLE}_siret "
-            f"ON {POSTGRES_TABLE} (siret)"
+            f"CREATE INDEX IF NOT EXISTS idx_{POSTGRES_TABLE}_siret ON {POSTGRES_TABLE} (siret)"
         )
         cur.execute(
             f"CREATE UNIQUE INDEX IF NOT EXISTS uq_{POSTGRES_TABLE}_siret_valid_from "
@@ -313,7 +312,9 @@ def ensure_postgres_table(dsn: str) -> None:
         conn.commit()
 
 
-def sync_gold_to_postgres(spark: SparkSession, jdbc_url: str, pg_user: str, pg_password: str) -> int:
+def sync_gold_to_postgres(
+    spark: SparkSession, jdbc_url: str, pg_user: str, pg_password: str
+) -> int:
     df = spark.table(GOLD_TABLE)
     df.write.option("truncate", "true").jdbc(
         url=jdbc_url,
@@ -553,7 +554,11 @@ import datetime as dt
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
-from registry.api.repository import EtablissementRepository, PostgresEtablissementRepository, build_dsn
+from registry.api.repository import (
+    EtablissementRepository,
+    PostgresEtablissementRepository,
+    build_dsn,
+)
 
 app = FastAPI(title="French Business Registry API")
 
@@ -595,9 +600,7 @@ def search_etablissements(
 
 
 @app.get("/etablissements/{siret}/history", response_model=list[Etablissement])
-def get_history(
-    siret: str, repo: EtablissementRepository = Depends(get_repository)
-) -> list[dict]:
+def get_history(siret: str, repo: EtablissementRepository = Depends(get_repository)) -> list[dict]:
     rows = repo.history(siret)
     if not rows:
         raise HTTPException(status_code=404, detail="Establishment not found")
