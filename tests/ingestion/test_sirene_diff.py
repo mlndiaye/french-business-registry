@@ -1,11 +1,17 @@
 import datetime as dt
+import io
 
+import boto3
 import responses
+from moto import mock_aws
+import pyarrow.parquet as pq
 
 from registry.ingestion.sirene_diff import (
     SIRENE_API_URL,
+    diff_object_key,
     fetch_sirene_updates,
     normalize_etablissement,
+    write_diff_to_bronze,
 )
 
 
@@ -126,3 +132,26 @@ def test_fetch_sirene_updates_follows_pagination_cursor():
     records = fetch_sirene_updates("test-api-key", dt.date(2026, 10, 1), dt.date(2026, 10, 2))
 
     assert [r["siret"] for r in records] == ["55203253400019", "73282932000014"]
+
+
+def test_diff_object_key_formats_ingestion_date():
+    key = diff_object_key(dt.date(2026, 10, 2))
+
+    assert key == "bronze/sirene/diff/ingestion_date=2026-10-02/diff.parquet"
+
+
+@mock_aws
+def test_write_diff_to_bronze_uploads_parquet(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.ingestion.sirene_diff.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    records = [normalize_etablissement(_etablissement("55203253400019", "99"))]
+
+    key = write_diff_to_bronze(records, bucket="lakehouse", work_dir=tmp_path)
+
+    client = boto3.client("s3", region_name="us-east-1")
+    obj = client.get_object(Bucket="lakehouse", Key=key)
+    table = pq.read_table(io.BytesIO(obj["Body"].read()))
+    assert table.num_rows == 1
+    assert table.column("siret").to_pylist() == ["55203253400019"]

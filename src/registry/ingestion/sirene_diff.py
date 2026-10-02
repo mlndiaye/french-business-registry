@@ -83,3 +83,20 @@ def fetch_sirene_updates(api_key: str, since: dt.date, until: dt.date) -> list[d
         curseur = next_curseur
 
     return records
+
+
+def diff_object_key(ingestion_date: dt.date) -> str:
+    return f"bronze/sirene/diff/ingestion_date={ingestion_date.isoformat()}/diff.parquet"
+
+
+def write_diff_to_bronze(records: list[dict], bucket: str, work_dir: Path) -> str:
+    table = pa.Table.from_pylist(
+        records, schema=pa.schema([(name, pa.string()) for name in BRONZE_COLUMNS])
+    )
+    parquet_path = work_dir / "diff.parquet"
+    pq.write_table(table, parquet_path)
+
+    client = get_s3_client()
+    key = diff_object_key(dt.date.today())
+    upload_file(client, parquet_path, bucket, key)
+    return key
