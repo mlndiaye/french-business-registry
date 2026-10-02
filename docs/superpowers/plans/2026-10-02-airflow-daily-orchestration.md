@@ -835,7 +835,18 @@ docker compose exec airflow-webserver airflow dags list | grep sirene_daily_pipe
 
 Expected: prints a line for `sirene_daily_pipeline`.
 
-- [ ] **Step 4: Trigger a manual run and observe the expected failure point**
+- [ ] **Step 4: Unpause the DAG**
+
+New DAGs are paused by default on creation — the scheduler will not execute a
+paused DAG's runs even if one is queued.
+
+```bash
+docker compose exec airflow-webserver airflow dags unpause sirene_daily_pipeline
+```
+
+Expected: prints `sirene_daily_pipeline | False` under `is_paused`.
+
+- [ ] **Step 5: Trigger a manual run and observe the expected failure point**
 
 ```bash
 docker compose exec airflow-webserver airflow dags trigger sirene_daily_pipeline
@@ -850,17 +861,32 @@ docker compose exec airflow-webserver airflow tasks states-for-dag-run sirene_da
 (`<run_id>` is printed by the `trigger` command, or found via `airflow dags
 list-runs -d sirene_daily_pipeline`.)
 
-Expected: `extract_daily_diff` fails — this is correct without a real
-`SIRENE_API_KEY` (Task 10 below). What this step actually verifies: the DAG
-scheduled the run, resolved `data_interval_start`/`data_interval_end`, and started
-executing the first task — i.e., the orchestration wiring itself works. Confirm the
-failure reason in the task log is a `KeyError: 'SIRENE_API_KEY'` or a Sirene API
-auth error, not an import error or a Python exception unrelated to the missing key —
-that would indicate a real bug rather than the expected missing-credential gap.
+Expected: `extract_daily_diff` fails, and `transform_bronze_to_silver` /
+`transform_silver_to_gold` both show `upstream_failed` (confirming the DAG
+correctly refused to run downstream tasks on a failed upstream, rather than
+running them with a bad/missing `bronze_key`). The failure itself is correct
+without a real `SIRENE_API_KEY` (Task 10 below) — what this step actually
+verifies is that the DAG scheduled the run, resolved `data_interval_start`/
+`data_interval_end`, executed the first task, and propagated the failure
+downstream correctly: the orchestration wiring works.
+
+Confirm the failure reason in the task log is a `requests.exceptions.HTTPError:
+401 Client Error: Unauthorized for url: https://api.insee.fr/...` (or a
+`KeyError: 'SIRENE_API_KEY'` if the variable is entirely unset rather than
+empty) — not an import error or an unrelated Python exception, which would
+indicate a real bug rather than the expected missing-credential gap.
+
+`airflow tasks logs` is not a valid subcommand on this Airflow version — read
+the log file directly instead (each task/run gets its own file):
 
 ```bash
-docker compose exec airflow-webserver airflow tasks logs sirene_daily_pipeline extract_daily_diff <run_id>
+docker compose exec airflow-scheduler find /opt/airflow/logs/dag_id=sirene_daily_pipeline -name "*.log"
+docker compose exec airflow-scheduler cat "/opt/airflow/logs/dag_id=sirene_daily_pipeline/run_id=<run_id>/task_id=extract_daily_diff/attempt=1.log"
 ```
+
+Note this must run against `airflow-scheduler`, not `airflow-webserver` — task
+logs are written to the executing container's local filesystem, and this
+Compose setup does not mount a shared log volume between the two.
 
 ---
 
