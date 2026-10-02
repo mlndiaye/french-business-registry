@@ -57,3 +57,29 @@ def normalize_etablissement(raw: dict) -> dict:
             "dateDernierTraitementEtablissement"
         ),
     }
+
+
+def fetch_sirene_updates(api_key: str, since: dt.date, until: dt.date) -> list[dict]:
+    records: list[dict] = []
+    curseur = "*"
+    headers = {"X-INSEE-Api-Key-Integration": api_key}
+    query = f"dateDernierTraitementEtablissement:[{since.isoformat()} TO {until.isoformat()}]"
+
+    while True:
+        response = requests.get(
+            SIRENE_API_URL,
+            headers=headers,
+            params={"q": query, "nombre": 1000, "curseur": curseur},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        records.extend(normalize_etablissement(e) for e in payload["etablissements"])
+
+        next_curseur = payload["header"]["curseurSuivant"]
+        if next_curseur == curseur:
+            break
+        curseur = next_curseur
+
+    return records
