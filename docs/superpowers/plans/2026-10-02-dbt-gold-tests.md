@@ -228,42 +228,73 @@ import argparse
 import datetime as dt
 
 from pyspark.sql import SparkSession
+from pyspark.sql.types import BooleanType, DateType, StringType, StructField, StructType
 
 from registry.transform.silver_to_gold import ensure_gold_table
 
 DEV_WAREHOUSE_DIR = ".dbt_dev_warehouse"
 GOLD_TABLE = "lakehouse.gold.sirene_etablissements_historized"
 
-GOLD_COLUMNS = [
-    "siren",
-    "nic",
-    "siret",
-    "statut_diffusion",
-    "date_creation",
-    "etablissement_siege",
-    "numero_voie",
-    "type_voie",
-    "libelle_voie",
-    "code_postal",
-    "libelle_commune",
-    "activite_principale",
-    "etat_administratif",
-    "date_dernier_traitement",
-    "valid_from",
-    "valid_to",
-    "is_current",
-]
+GOLD_SCHEMA = StructType(
+    [
+        StructField("siren", StringType()),
+        StructField("nic", StringType()),
+        StructField("siret", StringType()),
+        StructField("statut_diffusion", StringType()),
+        StructField("date_creation", DateType()),
+        StructField("etablissement_siege", BooleanType()),
+        StructField("numero_voie", StringType()),
+        StructField("type_voie", StringType()),
+        StructField("libelle_voie", StringType()),
+        StructField("code_postal", StringType()),
+        StructField("libelle_commune", StringType()),
+        StructField("activite_principale", StringType()),
+        StructField("etat_administratif", StringType()),
+        StructField("date_dernier_traitement", DateType()),
+        StructField("valid_from", DateType()),
+        StructField("valid_to", DateType()),
+        StructField("is_current", BooleanType()),
+    ]
+)
 
 GOOD_ROWS = [
     (
-        "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-        "8", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2023, 5, 12),
-        dt.date(2026, 10, 1), None, True,
+        "552032534",
+        "00019",
+        "55203253400019",
+        "O",
+        dt.date(1966, 1, 1),
+        True,
+        "8",
+        "RUE",
+        "DE LA PAIX",
+        "75002",
+        "PARIS",
+        "70.10Z",
+        "A",
+        dt.date(2023, 5, 12),
+        dt.date(2026, 10, 1),
+        None,
+        True,
     ),
     (
-        "732829320", "00014", "73282932000014", "O", dt.date(1994, 3, 15), False,
-        "12", "AV", "DES CHAMPS ELYSEES", "75008", "PARIS", "46.19B", "A", dt.date(2022, 11, 3),
-        dt.date(2026, 10, 1), None, True,
+        "732829320",
+        "00014",
+        "73282932000014",
+        "O",
+        dt.date(1994, 3, 15),
+        False,
+        "12",
+        "AV",
+        "DES CHAMPS ELYSEES",
+        "75008",
+        "PARIS",
+        "46.19B",
+        "A",
+        dt.date(2022, 11, 3),
+        dt.date(2026, 10, 1),
+        None,
+        True,
     ),
 ]
 
@@ -274,23 +305,65 @@ VIOLATION_ROWS = [
     # Second is_current=true row for an existing siret -> violates
     # assert_exactly_one_current_version_per_siret.
     (
-        "552032534", "00019", "55203253400019", "O", dt.date(1966, 1, 1), True,
-        "99", "RUE", "DE LA PAIX", "75002", "PARIS", "70.10Z", "A", dt.date(2026, 9, 30),
-        dt.date(2026, 10, 2), None, True,
+        "552032534",
+        "00019",
+        "55203253400019",
+        "O",
+        dt.date(1966, 1, 1),
+        True,
+        "99",
+        "RUE",
+        "DE LA PAIX",
+        "75002",
+        "PARIS",
+        "70.10Z",
+        "A",
+        dt.date(2026, 9, 30),
+        dt.date(2026, 10, 2),
+        None,
+        True,
     ),
     # Duplicate (siret, valid_from) for an existing siret -> violates
     # assert_unique_siret_valid_from.
     (
-        "732829320", "00014", "73282932000014", "O", dt.date(1994, 3, 15), False,
-        "12", "AV", "DES CHAMPS ELYSEES", "75008", "PARIS", "46.19B", "A", dt.date(2022, 11, 3),
-        dt.date(2026, 10, 1), dt.date(2026, 10, 2), False,
+        "732829320",
+        "00014",
+        "73282932000014",
+        "O",
+        dt.date(1994, 3, 15),
+        False,
+        "12",
+        "AV",
+        "DES CHAMPS ELYSEES",
+        "75008",
+        "PARIS",
+        "46.19B",
+        "A",
+        dt.date(2022, 11, 3),
+        dt.date(2026, 10, 1),
+        dt.date(2026, 10, 2),
+        False,
     ),
     # is_current=true but valid_to is also set -> violates
     # assert_valid_to_matches_is_current.
     (
-        "999999999", "00001", "99999999900001", "O", dt.date(2020, 1, 1), True,
-        "1", "RUE", "DU TEST", "75001", "PARIS", "62.01Z", "A", dt.date(2026, 10, 1),
-        dt.date(2026, 10, 1), dt.date(2026, 10, 5), True,
+        "999999999",
+        "00001",
+        "99999999900001",
+        "O",
+        dt.date(2020, 1, 1),
+        True,
+        "1",
+        "RUE",
+        "DU TEST",
+        "75001",
+        "PARIS",
+        "62.01Z",
+        "A",
+        dt.date(2026, 10, 1),
+        dt.date(2026, 10, 1),
+        dt.date(2026, 10, 5),
+        True,
     ),
 ]
 
@@ -317,7 +390,7 @@ def seed(with_violations: bool) -> None:
     ensure_gold_table(spark, GOLD_TABLE)
 
     rows = list(GOOD_ROWS) + (VIOLATION_ROWS if with_violations else [])
-    spark.createDataFrame(rows, schema=GOLD_COLUMNS).writeTo(GOLD_TABLE).append()
+    spark.createDataFrame(rows, schema=GOLD_SCHEMA).writeTo(GOLD_TABLE).append()
 
     print(f"Seeded {len(rows)} rows into {GOLD_TABLE} (violations={with_violations})")
     spark.stop()
@@ -329,6 +402,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     seed(args.with_violations)
 ```
+
+**Note (post-implementation):** the first run failed with
+`PySparkValueError: [CANNOT_DETERMINE_TYPE] Some of types cannot be determined
+after inferring.` — `createDataFrame` can't infer a column's type from a sample
+where every value is `None` (`valid_to` is `None` in every row of `GOOD_ROWS`).
+Fixed by passing an explicit `StructType` (`GOLD_SCHEMA`, shown above) matching
+`ensure_gold_table`'s DDL instead of a plain list of column names.
 
 - [ ] **Step 2: Run it and verify the data landed**
 
