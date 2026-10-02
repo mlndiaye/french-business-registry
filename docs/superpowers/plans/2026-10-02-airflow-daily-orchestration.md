@@ -572,10 +572,12 @@ project's dependencies (pyspark, boto3, pyarrow, requests) — allow several min
 
 Run:
 ```bash
-docker run --rm registry-airflow:local java -version
+docker run --rm --entrypoint bash registry-airflow:local -c "java -version"
 docker run --rm registry-airflow:local python -c "import registry.ingestion.sirene_diff; import pyspark; print('ok')"
 ```
-Expected: both print successfully (`openjdk version ...` and `ok`).
+Expected: both print successfully (`openjdk version ...` and `ok`). The first command
+needs `--entrypoint bash` — the base image's own entrypoint otherwise treats `java`
+as an (invalid) Airflow CLI subcommand rather than running it directly.
 
 - [ ] **Step 4: Commit**
 
