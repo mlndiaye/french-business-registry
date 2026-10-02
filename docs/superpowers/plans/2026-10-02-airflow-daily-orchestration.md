@@ -206,15 +206,9 @@ def normalize_etablissement(raw: dict) -> dict:
         "libelleVoieEtablissement": adresse.get("libelleVoieEtablissement"),
         "codePostalEtablissement": adresse.get("codePostalEtablissement"),
         "libelleCommuneEtablissement": adresse.get("libelleCommuneEtablissement"),
-        "activitePrincipaleEtablissement": periode_courante.get(
-            "activitePrincipaleEtablissement"
-        ),
-        "etatAdministratifEtablissement": periode_courante.get(
-            "etatAdministratifEtablissement"
-        ),
-        "dateDernierTraitementEtablissement": raw.get(
-            "dateDernierTraitementEtablissement"
-        ),
+        "activitePrincipaleEtablissement": periode_courante.get("activitePrincipaleEtablissement"),
+        "etatAdministratifEtablissement": periode_courante.get("etatAdministratifEtablissement"),
+        "dateDernierTraitementEtablissement": raw.get("dateDernierTraitementEtablissement"),
     }
 ```
 
@@ -512,7 +506,9 @@ Expected: FAIL with `ImportError: cannot import name 'run_daily_diff'`
 Append to `src/registry/ingestion/sirene_diff.py`:
 
 ```python
-def run_daily_diff(api_key: str, bucket: str, since: dt.date, until: dt.date, work_dir: Path) -> str:
+def run_daily_diff(
+    api_key: str, bucket: str, since: dt.date, until: dt.date, work_dir: Path
+) -> str:
     records = fetch_sirene_updates(api_key, since, until)
     return write_diff_to_bronze(records, bucket, work_dir)
 ```
