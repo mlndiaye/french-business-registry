@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: lakehouse
+    description: >
+      Iceberg lakehouse tables produced by the PySpark bronze-to-gold pipeline
+      (see docs/superpowers/specs/2026-10-01-sirene-lakehouse-design.md).
+    schema: gold
+    tables:
+      - name: sirene_etablissements_historized
+        description: >
+          SCD2-historized SIRENE establishment registry. Any change on any
+          tracked column opens a new version; `is_current` marks the single
+          currently-valid version per `siret`.
+        columns:
+          - name: siren
+            description: 9-digit company identifier.
+            tests:
+              - not_null
+          - name: siret
+            description: 14-digit establishment identifier (siren + nic).
+            tests:
+              - not_null
+          - name: valid_from
+            description: Date from which this version became valid.
+            tests:
+              - not_null
+          - name: is_current
+            description: True for the single currently-valid version of each establishment.
+            tests:
+              - not_null
