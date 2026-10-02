@@ -5,13 +5,18 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+from pathlib import Path
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import BooleanType, DateType, StringType, StructField, StructType
 
 from registry.transform.silver_to_gold import ensure_gold_table
 
-DEV_WAREHOUSE_DIR = ".dbt_dev_warehouse"
+# Absolute and anchored on this file's location (not the caller's CWD): Iceberg's
+# Hadoop catalog embeds the warehouse path literally into its metadata files, so a
+# relative path here would break as soon as a reader (e.g. dbt, run from dbt/)
+# resolves it against a different working directory than the writer used.
+DEV_WAREHOUSE_DIR = str(Path(__file__).resolve().parent.parent / ".dbt_dev_warehouse")
 GOLD_TABLE = "lakehouse.gold.sirene_etablissements_historized"
 
 GOLD_SCHEMA = StructType(
