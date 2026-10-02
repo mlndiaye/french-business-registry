@@ -54,21 +54,33 @@ out of scope here.
   equivalent of Plan 2's local-catalog pytest fixtures: fast, deterministic,
   no network — and, critically, a way to prove the tests actually fail on bad data
   (Task 7), not just pass on good data.
-- **Sources use an explicit `database: lakehouse` key** in `sources.yml`, rather
-  than relying on `dbt-spark`'s profile-level `catalog:` field (added primarily for
-  Databricks Unity Catalog). `database` is a universal dbt concept every adapter
-  resolves into the generated SQL's qualified table name
-  (`lakehouse.gold.sirene_etablissements_historized`), which is lower-risk than
-  depending on an adapter-specific, less-universally-documented option.
-- **Two unverified assumptions, flagged for Task 1 to confirm quickly rather than
-  guess blindly:** (1) that `dbt-spark`'s session connector correctly threads
-  `server_side_parameters` into the embedded `SparkSession.builder.config(...)`
-  calls (this is the documented pattern for local/dev use of `dbt-spark`, but this
-  environment has not exercised it before); (2) that the resulting session
-  correctly resolves 3-part `catalog.schema.table` identifiers from the
-  `database`/`schema` source keys against our named `lakehouse` Iceberg catalog.
-  Task 1's `dbt debug` + a trivial query are the cheap way to find out before
-  building the rest of the plan on top of it.
+- **Catalog resolution: `spark.sql.defaultCatalog`, not a 3-part identifier.**
+  The original design assumed `dbt-spark` could address our named `lakehouse`
+  Iceberg catalog via a `database:` key on the source (or a `catalog:` profile
+  field). Neither works: `dbt-spark`'s `SparkRelation.__post_init__` hard-rejects a
+  `database` that differs from `schema` ("Cannot set database in spark!"), and its
+  `SparkIncludePolicy` never renders a database/catalog component in generated SQL
+  at all (`database: bool = False`) — this adapter only ever emits 2-part
+  `schema.identifier` references, independent of any profile `catalog`/`database`
+  setting. The actual fix: make `lakehouse` the Spark session's **default
+  catalog**, via `"spark.sql.defaultCatalog": "lakehouse"` in
+  `server_side_parameters`, so dbt's unqualified 2-part `gold.<table>` reference
+  resolves against it. `sources.yml` needs only `schema: gold` — no `database:`.
+- **The `dev` target's Iceberg warehouse path must be absolute, matching exactly
+  between the seed script and `profiles.yml`.** Iceberg's Hadoop catalog embeds the
+  warehouse path literally into each table's metadata/manifest files at write time;
+  a relative path (e.g. `.dbt_dev_warehouse`) resolves differently depending on the
+  *reading* process's working directory. Since the seed script runs from the repo
+  root and dbt runs from `dbt/`, a relative path silently pointed at two different
+  (non-existent, for dbt) directories — first surfacing as `TABLE_OR_VIEW_NOT_FOUND`,
+  then (once the catalog config was fixed) as a `FileNotFoundException` on the data
+  file, since the table's metadata itself embedded the writer's relative path. Fixed
+  by: (1) the seed script resolving its warehouse path from its own file location
+  (`Path(__file__).resolve().parent.parent / ".dbt_dev_warehouse"`), not the caller's
+  CWD; (2) `profiles.yml` requiring `DBT_DEV_WAREHOUSE` with no fallback default
+  (a wrong-but-present relative default is exactly what caused this, twice); (3)
+  `DBT_DEV_WAREHOUSE` set once, absolutely, in `.env` (machine-specific, like every
+  other path/credential there) rather than re-derived per command.
 
 ## Architecture
 
@@ -93,8 +105,26 @@ prod target: dbt test  -->  embedded PySpark session  -->  s3a://lakehouse/... (
 **Files:**
 - Modify: `pyproject.toml`
 - Modify: `.gitignore`
+- Modify: `.env` / `.env.example`
 - Create: `dbt/dbt_project.yml`
 - Create: `dbt/profiles.yml`
+
+- [ ] **Step 0: Add `DBT_DEV_WAREHOUSE` to `.env`/`.env.example`**
+
+Append to `.env.example`:
+
+```
+# Absolute path to this repo's .dbt_dev_warehouse/ directory (machine-specific —
+# Iceberg's Hadoop catalog embeds this path literally in its metadata, so it must
+# be absolute and must match what scripts/seed_dbt_dev_warehouse.py resolves to).
+DBT_DEV_WAREHOUSE=
+```
+
+Append the real, absolute value to `.env` (not committed):
+
+```bash
+grep -q "^DBT_DEV_WAREHOUSE=" .env || echo "DBT_DEV_WAREHOUSE=$(pwd)/.dbt_dev_warehouse" >> .env
+```
 
 - [ ] **Step 1: Add `dbt-spark` to dependencies**
 
@@ -145,24 +175,26 @@ french_business_registry:
       type: spark
       method: session
       host: NA
-      schema: default
+      schema: gold
       server_side_parameters:
         "spark.jars.packages": "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1"
         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         "spark.sql.catalog.lakehouse": "org.apache.iceberg.spark.SparkCatalog"
         "spark.sql.catalog.lakehouse.type": "hadoop"
-        "spark.sql.catalog.lakehouse.warehouse": "{{ env_var('DBT_DEV_WAREHOUSE', '.dbt_dev_warehouse') }}"
+        "spark.sql.catalog.lakehouse.warehouse": "{{ env_var('DBT_DEV_WAREHOUSE') }}"
+        "spark.sql.defaultCatalog": "lakehouse"
     prod:
       type: spark
       method: session
       host: NA
-      schema: default
+      schema: gold
       server_side_parameters:
         "spark.jars.packages": "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262"
         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         "spark.sql.catalog.lakehouse": "org.apache.iceberg.spark.SparkCatalog"
         "spark.sql.catalog.lakehouse.type": "hadoop"
         "spark.sql.catalog.lakehouse.warehouse": "s3a://{{ env_var('LAKEHOUSE_BUCKET') }}/warehouse"
+        "spark.sql.defaultCatalog": "lakehouse"
         "spark.hadoop.fs.s3a.endpoint": "{{ env_var('S3_ENDPOINT_URL') }}"
         "spark.hadoop.fs.s3a.endpoint.region": "{{ env_var('S3_REGION') }}"
         "spark.hadoop.fs.s3a.access.key": "{{ env_var('S3_ACCESS_KEY') }}"
@@ -173,9 +205,16 @@ french_business_registry:
         "spark.hadoop.fs.s3a.multiobjectdelete.enable": "false"
 ```
 
-The `dev` target needs no env vars set (its `env_var()` call has a default). The
-`prod` target's `env_var()` calls have no defaults — they will raise a clear error
-if `.env` hasn't been sourced, which is the desired behavior.
+**Note (post-implementation):** this is the corrected version — see the "Catalog
+resolution" and warehouse-path entries in "Decisions made" above for what the
+original draft got wrong and why. `schema: gold` plus `spark.sql.defaultCatalog:
+lakehouse` is what makes dbt's unqualified `gold.<table>` reference resolve
+correctly; neither target's `env_var('DBT_DEV_WAREHOUSE')` has a fallback default
+on purpose, since a wrong-but-present default is exactly what caused the
+warehouse-path bug the first time. Both targets' `env_var()` calls will raise a
+clear error if `.env` hasn't been sourced — set `DBT_DEV_WAREHOUSE` once in `.env`
+(see Task 2) and always run `set -a && source ../.env && set +a` (from `dbt/`)
+before any `dbt` command in this plan.
 
 - [ ] **Step 4: Add dbt artifacts to `.gitignore`**
 
@@ -191,6 +230,7 @@ dbt/logs/
 - [ ] **Step 5: Smoke-check the connection**
 
 ```bash
+set -a && source .env && set +a
 cd dbt && uv run dbt debug --profiles-dir . --target dev
 ```
 
@@ -205,7 +245,7 @@ building further tasks on an unconfirmed connection.
 
 ```bash
 cd ..
-git add pyproject.toml uv.lock .gitignore dbt/dbt_project.yml dbt/profiles.yml
+git add pyproject.toml uv.lock .gitignore .env.example dbt/dbt_project.yml dbt/profiles.yml
 git commit -m "feat: scaffold dbt project with session-mode Spark connection"
 ```
 
@@ -443,6 +483,13 @@ git commit -m "feat: add dev warehouse seed script for dbt test verification"
 
 ---
 
+**Note for every task from here on:** every `dbt ... --target dev` command below
+assumes `.env` has already been sourced in the current shell (`set -a && source
+.env && set +a` from the repo root) so `DBT_DEV_WAREHOUSE` is set — see Task 1's
+Step 0 and the "Catalog resolution" / warehouse-path entries in "Decisions made".
+Without it, `dbt` fails fast with a clear "env var required" error rather than the
+confusing not-found errors this plan's execution originally hit.
+
 ### Task 3: Source definition with generic tests
 
 **Files:**
@@ -457,8 +504,9 @@ sources:
   - name: lakehouse
     description: >
       Iceberg lakehouse tables produced by the PySpark bronze-to-gold pipeline
-      (see docs/superpowers/specs/2026-10-01-sirene-lakehouse-design.md).
-    database: lakehouse
+      (see docs/superpowers/specs/2026-10-01-sirene-lakehouse-design.md). Catalog
+      resolution happens via `spark.sql.defaultCatalog` in profiles.yml, not a
+      `database:` key here — see "Decisions made" above.
     schema: gold
     tables:
       - name: sirene_etablissements_historized

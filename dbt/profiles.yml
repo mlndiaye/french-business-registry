@@ -5,24 +5,26 @@ french_business_registry:
       type: spark
       method: session
       host: NA
-      schema: default
+      schema: gold
       server_side_parameters:
         "spark.jars.packages": "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1"
         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         "spark.sql.catalog.lakehouse": "org.apache.iceberg.spark.SparkCatalog"
         "spark.sql.catalog.lakehouse.type": "hadoop"
-        "spark.sql.catalog.lakehouse.warehouse": "{{ env_var('DBT_DEV_WAREHOUSE', '.dbt_dev_warehouse') }}"
+        "spark.sql.catalog.lakehouse.warehouse": "{{ env_var('DBT_DEV_WAREHOUSE') }}"
+        "spark.sql.defaultCatalog": "lakehouse"
     prod:
       type: spark
       method: session
       host: NA
-      schema: default
+      schema: gold
       server_side_parameters:
         "spark.jars.packages": "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262"
         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         "spark.sql.catalog.lakehouse": "org.apache.iceberg.spark.SparkCatalog"
         "spark.sql.catalog.lakehouse.type": "hadoop"
         "spark.sql.catalog.lakehouse.warehouse": "s3a://{{ env_var('LAKEHOUSE_BUCKET') }}/warehouse"
+        "spark.sql.defaultCatalog": "lakehouse"
         "spark.hadoop.fs.s3a.endpoint": "{{ env_var('S3_ENDPOINT_URL') }}"
         "spark.hadoop.fs.s3a.endpoint.region": "{{ env_var('S3_REGION') }}"
         "spark.hadoop.fs.s3a.access.key": "{{ env_var('S3_ACCESS_KEY') }}"
