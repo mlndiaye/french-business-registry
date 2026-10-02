@@ -8,6 +8,7 @@ dependencies = [
     "pyarrow>=16.0",
     "requests>=2.31",
     "pyspark==3.5.3",
+    "dbt-spark[session]>=1.11,<1.12",
 ]
 
 [dependency-groups]
