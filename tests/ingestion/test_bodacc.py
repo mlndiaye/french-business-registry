@@ -14,6 +14,7 @@ from registry.ingestion.bodacc import (
     extract_siren_from_registre,
     fetch_bodacc_announcements,
     normalize_announcement,
+    run_ingestion,
     write_announcements_to_bronze,
 )
 
@@ -146,3 +147,32 @@ def test_write_announcements_to_bronze_uploads_parquet(tmp_path, monkeypatch):
     table = pq.read_table(io.BytesIO(obj["Body"].read()))
     assert table.num_rows == 1
     assert table.column("id").to_pylist() == ["A"]
+
+
+@responses.activate
+@mock_aws
+def test_run_ingestion_fetches_and_uploads_to_bronze(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.ingestion.bodacc.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    responses.add(
+        responses.GET,
+        BODACC_API_URL,
+        json={"results": [_raw_announcement("A", "111111111")]},
+        status=200,
+    )
+
+    key = run_ingestion(
+        bucket="lakehouse",
+        since=dt.date(2025, 10, 1),
+        until=dt.date(2025, 10, 16),
+        work_dir=tmp_path,
+        run_type="bootstrap",
+    )
+
+    client = boto3.client("s3", region_name="us-east-1")
+    obj = client.get_object(Bucket="lakehouse", Key=key)
+    table = pq.read_table(io.BytesIO(obj["Body"].read()))
+    assert table.num_rows == 1
+    assert "bronze/bodacc/bootstrap/" in key

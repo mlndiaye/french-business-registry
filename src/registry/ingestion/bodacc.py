@@ -106,3 +106,10 @@ def write_announcements_to_bronze(
     key = bronze_object_key(dt.date.today(), run_type)
     upload_file(client, parquet_path, bucket, key)
     return key
+
+
+def run_ingestion(
+    bucket: str, since: dt.date, until: dt.date, work_dir: Path, run_type: str
+) -> str:
+    records = fetch_bodacc_announcements(since, until)
+    return write_announcements_to_bronze(records, bucket, work_dir, run_type)
