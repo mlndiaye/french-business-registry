@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import requests
+
+from registry.ingestion.storage import get_s3_client, upload_file
 
 SIREN_IN_TEXT_PATTERN = re.compile(r"\b(\d[\d ]{0,11}\d)\b")
 
@@ -82,3 +87,22 @@ def fetch_bodacc_announcements(since: dt.date, until: dt.date, page_size: int = 
         offset += page_size
 
     return records
+
+
+def bronze_object_key(ingestion_date: dt.date, run_type: str) -> str:
+    return f"bronze/bodacc/{run_type}/ingestion_date={ingestion_date.isoformat()}/bodacc.parquet"
+
+
+def write_announcements_to_bronze(
+    records: list[dict], bucket: str, work_dir: Path, run_type: str
+) -> str:
+    table = pa.Table.from_pylist(
+        records, schema=pa.schema([(name, pa.string()) for name in BODACC_COLUMNS])
+    )
+    parquet_path = work_dir / "bodacc.parquet"
+    pq.write_table(table, parquet_path)
+
+    client = get_s3_client()
+    key = bronze_object_key(dt.date.today(), run_type)
+    upload_file(client, parquet_path, bucket, key)
+    return key

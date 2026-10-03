@@ -2,11 +2,19 @@ import datetime as dt
 
 import responses
 
+import io
+
+import boto3
+import pyarrow.parquet as pq
+from moto import mock_aws
+
 from registry.ingestion.bodacc import (
     BODACC_API_URL,
+    bronze_object_key,
     extract_siren_from_registre,
     fetch_bodacc_announcements,
     normalize_announcement,
+    write_announcements_to_bronze,
 )
 
 
@@ -113,3 +121,28 @@ def test_fetch_bodacc_announcements_follows_offset_pagination():
     records = fetch_bodacc_announcements(dt.date(2025, 10, 1), dt.date(2025, 10, 16), page_size=1)
 
     assert [r["id"] for r in records] == ["A", "B"]
+
+
+def test_bronze_object_key_formats_run_type_and_date():
+    key = bronze_object_key(dt.date(2026, 10, 3), "bootstrap")
+
+    assert key == "bronze/bodacc/bootstrap/ingestion_date=2026-10-03/bodacc.parquet"
+
+
+@mock_aws
+def test_write_announcements_to_bronze_uploads_parquet(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.ingestion.bodacc.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    records = [normalize_announcement(_raw_announcement("A", "111111111"))]
+
+    key = write_announcements_to_bronze(
+        records, bucket="lakehouse", work_dir=tmp_path, run_type="diff"
+    )
+
+    client = boto3.client("s3", region_name="us-east-1")
+    obj = client.get_object(Bucket="lakehouse", Key=key)
+    table = pq.read_table(io.BytesIO(obj["Body"].read()))
+    assert table.num_rows == 1
+    assert table.column("id").to_pylist() == ["A"]
