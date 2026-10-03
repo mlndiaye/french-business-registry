@@ -1,4 +1,30 @@
-from registry.ingestion.bodacc import extract_siren_from_registre, normalize_announcement
+import datetime as dt
+
+import responses
+
+from registry.ingestion.bodacc import (
+    BODACC_API_URL,
+    extract_siren_from_registre,
+    fetch_bodacc_announcements,
+    normalize_announcement,
+)
+
+
+def _raw_announcement(id_: str, siren: str) -> dict:
+    return {
+        "id": id_,
+        "dateparution": "2025-10-15",
+        "numeroannonce": "1",
+        "typeavis_lib": "Jugement",
+        "familleavis_lib": "Procedures collectives",
+        "tribunal": "Tribunal de commerce de Paris",
+        "commercant": "DUPONT BATIMENT SARL",
+        "siren": siren,
+        "registre": None,
+        "ville": "PARIS",
+        "cp": "75002",
+        "denomination": None,
+    }
 
 
 def test_extract_siren_from_registre_with_spaces():
@@ -61,3 +87,29 @@ def test_normalize_announcement_prefers_direct_siren_field():
     result = normalize_announcement(raw)
 
     assert result["siren_declared"] == "552032534"
+
+
+@responses.activate
+def test_fetch_bodacc_announcements_follows_offset_pagination():
+    responses.add(
+        responses.GET,
+        BODACC_API_URL,
+        json={"results": [_raw_announcement("A", "111111111")]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        BODACC_API_URL,
+        json={"results": [_raw_announcement("B", "222222222")]},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        BODACC_API_URL,
+        json={"results": []},
+        status=200,
+    )
+
+    records = fetch_bodacc_announcements(dt.date(2025, 10, 1), dt.date(2025, 10, 16), page_size=1)
+
+    assert [r["id"] for r in records] == ["A", "B"]

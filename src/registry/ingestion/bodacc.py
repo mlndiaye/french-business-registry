@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 
+import requests
+
 SIREN_IN_TEXT_PATTERN = re.compile(r"\b(\d[\d ]{0,11}\d)\b")
+
+BODACC_API_URL = (
+    "https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
+    "annonces-commerciales/records"
+)
 
 
 def extract_siren_from_registre(registre: str | None) -> str | None:
@@ -49,3 +57,28 @@ def normalize_announcement(raw: dict) -> dict:
         "cp": raw.get("cp"),
         "denomination": raw.get("denomination"),
     }
+
+
+def fetch_bodacc_announcements(since: dt.date, until: dt.date, page_size: int = 100) -> list[dict]:
+    records: list[dict] = []
+    offset = 0
+    where_clause = (
+        f"dateparution >= date'{since.isoformat()}' "
+        f"AND dateparution < date'{until.isoformat()}'"
+    )
+
+    while True:
+        response = requests.get(
+            BODACC_API_URL,
+            params={"where": where_clause, "limit": page_size, "offset": offset},
+            timeout=30,
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
+        records.extend(normalize_announcement(r) for r in results)
+
+        if len(results) < page_size:
+            break
+        offset += page_size
+
+    return records
