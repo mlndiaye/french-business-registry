@@ -45,6 +45,31 @@ here.
   real responses — the `siren` direct-field branch is correct to keep (harmless,
   just unexercised against this dataset) and `denomination` stays `None` from
   `commercant` alone, which is what Plan 2 (entity resolution) will match on.
+- **Note (post-implementation, Task 9): the spec's "12-month bootstrap is a
+  manageable volume" assumption was wrong for a national feed.** A 12-month
+  national window is **~4 million rows** (`total_count` checked directly against
+  the live API before attempting any fetch) — at `page_size=100` that's ~40,700
+  sequential requests, impractical for this project's scope. Fixed by adding an
+  optional `department` parameter to `fetch_bodacc_announcements` and
+  `run_ingestion`, filtering on BODACC's `numerodepartement` field (same
+  where-clause mechanism as the date range). Checked candidate volumes directly
+  against the live API before picking one: dept. 75 (Paris) alone is still
+  ~413k rows over 12 months (too large); dept. 08 (Ardennes) is ~9,400 rows over
+  12 months — a manageable, genuinely real (not artificially sampled) dataset.
+  This also updates the Step 2 design spec's scope assumption for Plan 2
+  (entity resolution) and onward: BODACC ingestion for this project is
+  department-scoped, not national.
+- **Also discovered in Task 9: `responses` and `moto`'s `mock_aws` can silently
+  intercept zero HTTP calls when stacked as `@responses.activate` /
+  `@mock_aws` (outer to inner) and the mocked JSON response is `{"results":
+  []}`** — the test passes with an empty result list and no exception, which is
+  easy to mistake for "the code returned no data" rather than "the mock never
+  saw the call." Swapping the order (`@mock_aws` outer, `@responses.activate`
+  inner) fixed it for the new test that hit this; the existing test with a
+  non-empty response wasn't affected and was left as-is, since its assertions
+  already prove the real HTTP interception path works. Root cause not fully
+  chased down — flagged here so a future "0 calls recorded, no error" surprise
+  in this codebase isn't re-debugged from scratch.
 - **One ingestion module for bootstrap and diff**, not two (contrast with Step 1's
   separate `sirene_bootstrap.py`/`sirene_diff.py`, which genuinely needed to differ
   since one reads a bulk CSV and the other calls a REST API). BODACC bootstrap and
@@ -840,7 +865,11 @@ two-element list, not a string, and `numeroannonce` is an int. See the
 applied to `extract_siren_from_registre` and `normalize_announcement`, with two
 new regression tests) before continuing to Step 2.
 
-- [ ] **Step 2: Run the real 12-month bootstrap**
+- [ ] **Step 2: Run the real 12-month bootstrap, scoped to department 08 (Ardennes)**
+
+A national 12-month window is ~4 million rows (checked directly against the live
+API — see "Decisions made"); department 08 narrows this to ~9,400 rows, a
+manageable volume for a single run.
 
 ```bash
 docker compose up -d garage
@@ -857,6 +886,7 @@ key = run_ingestion(
     until=today,
     work_dir=Path('/tmp'),
     run_type='bootstrap',
+    department='08',
 )
 print(key)
 "
@@ -866,8 +896,8 @@ Expected: prints a key of the form
 `bronze/bodacc/bootstrap/ingestion_date=<today>/bodacc.parquet`. Note how many
 announcements this fetched (printed by `fetch_bodacc_announcements` if you add a
 temporary `print(len(records))`, or check the Parquet file's row count directly)
-to sanity-check the volume is plausible for 12 months of a department/national
-feed, not suspiciously tiny or huge.
+to sanity-check the volume is close to the ~9,400 expected for department 08 over
+12 months, not suspiciously tiny or huge.
 
 - [ ] **Step 3: Run bronze_to_silver against the real bootstrap output**
 

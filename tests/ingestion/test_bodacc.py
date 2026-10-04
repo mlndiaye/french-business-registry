@@ -155,6 +155,24 @@ def test_fetch_bodacc_announcements_follows_offset_pagination():
     assert [r["id"] for r in records] == ["A", "B"]
 
 
+@responses.activate
+def test_fetch_bodacc_announcements_filters_by_department():
+    # A national 12-month window is ~4M rows (discovered in Task 9's manual
+    # verification) — impractical to fetch in full. department narrows this to a
+    # manageable volume via the same where-clause mechanism as the date range.
+    responses.add(
+        responses.GET,
+        BODACC_API_URL,
+        json={"results": []},
+        status=200,
+    )
+
+    fetch_bodacc_announcements(dt.date(2025, 10, 1), dt.date(2025, 10, 16), department="08")
+
+    request_url = responses.calls[0].request.url
+    assert "numerodepartement%3D%2708%27" in request_url
+
+
 def test_bronze_object_key_formats_run_type_and_date():
     key = bronze_object_key(dt.date(2026, 10, 3), "bootstrap")
 
@@ -207,3 +225,30 @@ def test_run_ingestion_fetches_and_uploads_to_bronze(tmp_path, monkeypatch):
     table = pq.read_table(io.BytesIO(obj["Body"].read()))
     assert table.num_rows == 1
     assert "bronze/bodacc/bootstrap/" in key
+
+
+@mock_aws
+@responses.activate
+def test_run_ingestion_passes_department_through(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.ingestion.bodacc.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    responses.add(
+        responses.GET,
+        BODACC_API_URL,
+        json={"results": []},
+        status=200,
+    )
+
+    run_ingestion(
+        bucket="lakehouse",
+        since=dt.date(2025, 10, 1),
+        until=dt.date(2025, 10, 16),
+        work_dir=tmp_path,
+        run_type="bootstrap",
+        department="08",
+    )
+
+    request_url = responses.calls[0].request.url
+    assert "numerodepartement%3D%2708%27" in request_url

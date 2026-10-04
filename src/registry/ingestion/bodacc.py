@@ -72,12 +72,19 @@ def normalize_announcement(raw: dict) -> dict:
     }
 
 
-def fetch_bodacc_announcements(since: dt.date, until: dt.date, page_size: int = 100) -> list[dict]:
+def fetch_bodacc_announcements(
+    since: dt.date,
+    until: dt.date,
+    page_size: int = 100,
+    department: str | None = None,
+) -> list[dict]:
     records: list[dict] = []
     offset = 0
     where_clause = (
         f"dateparution >= date'{since.isoformat()}' AND dateparution < date'{until.isoformat()}'"
     )
+    if department:
+        where_clause += f" AND numerodepartement='{department}'"
 
     while True:
         response = requests.get(
@@ -116,7 +123,12 @@ def write_announcements_to_bronze(
 
 
 def run_ingestion(
-    bucket: str, since: dt.date, until: dt.date, work_dir: Path, run_type: str
+    bucket: str,
+    since: dt.date,
+    until: dt.date,
+    work_dir: Path,
+    run_type: str,
+    department: str | None = None,
 ) -> str:
-    records = fetch_bodacc_announcements(since, until)
+    records = fetch_bodacc_announcements(since, until, department=department)
     return write_announcements_to_bronze(records, bucket, work_dir, run_type)
