@@ -1,6 +1,6 @@
 from pyspark.sql.types import StringType, StructField, StructType
 
-from registry.transform.bodacc_to_silver import clean_bodacc_bronze
+from registry.transform.bodacc_to_silver import bronze_to_silver, clean_bodacc_bronze
 
 BRONZE_COLUMN_NAMES = [
     "id",
@@ -83,3 +83,33 @@ def test_clean_bodacc_bronze_drops_rows_with_missing_id(spark_session):
     result = clean_bodacc_bronze(raw_df).collect()
 
     assert [row.id for row in result] == ["BX202500012345"]
+
+
+def test_bronze_to_silver_writes_cleaned_iceberg_table(spark_session, tmp_path, table_suffix):
+    bronze_df = spark_session.createDataFrame(
+        [
+            (
+                "BX202500012345",
+                "2025-10-15",
+                "12345",
+                "Jugement",
+                "Procedures collectives",
+                "Tribunal de commerce de Paris",
+                "DUPONT BATIMENT SARL",
+                "334393806",
+                "PARIS",
+                "75002",
+                None,
+            )
+        ],
+        schema=BRONZE_SCHEMA,
+    )
+    bronze_path = str(tmp_path / "bronze_bodacc.parquet")
+    bronze_df.write.parquet(bronze_path)
+    silver_table = f"lakehouse.silver.bodacc_{table_suffix}"
+
+    bronze_to_silver(spark_session, bronze_path, silver_table)
+
+    result = spark_session.table(silver_table).collect()
+    assert len(result) == 1
+    assert result[0].id == "BX202500012345"
