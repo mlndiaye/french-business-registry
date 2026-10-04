@@ -1,11 +1,9 @@
 import datetime as dt
-
-import responses
-
 import io
 
 import boto3
 import pyarrow.parquet as pq
+import responses
 from moto import mock_aws
 
 from registry.ingestion.bodacc import (

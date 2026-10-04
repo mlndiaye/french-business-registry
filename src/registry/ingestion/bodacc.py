@@ -68,8 +68,7 @@ def fetch_bodacc_announcements(since: dt.date, until: dt.date, page_size: int = 
     records: list[dict] = []
     offset = 0
     where_clause = (
-        f"dateparution >= date'{since.isoformat()}' "
-        f"AND dateparution < date'{until.isoformat()}'"
+        f"dateparution >= date'{since.isoformat()}' AND dateparution < date'{until.isoformat()}'"
     )
 
     while True:

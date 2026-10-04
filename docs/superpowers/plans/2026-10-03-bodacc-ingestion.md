@@ -321,9 +321,7 @@ def test_fetch_bodacc_announcements_follows_offset_pagination():
         status=200,
     )
 
-    records = fetch_bodacc_announcements(
-        dt.date(2025, 10, 1), dt.date(2025, 10, 16), page_size=1
-    )
+    records = fetch_bodacc_announcements(dt.date(2025, 10, 1), dt.date(2025, 10, 16), page_size=1)
 
     assert [r["id"] for r in records] == ["A", "B"]
 ```
@@ -345,14 +343,11 @@ BODACC_API_URL = (
 )
 
 
-def fetch_bodacc_announcements(
-    since: dt.date, until: dt.date, page_size: int = 100
-) -> list[dict]:
+def fetch_bodacc_announcements(since: dt.date, until: dt.date, page_size: int = 100) -> list[dict]:
     records: list[dict] = []
     offset = 0
     where_clause = (
-        f"dateparution >= date'{since.isoformat()}' "
-        f"AND dateparution < date'{until.isoformat()}'"
+        f"dateparution >= date'{since.isoformat()}' AND dateparution < date'{until.isoformat()}'"
     )
 
     while True:
@@ -422,7 +417,9 @@ def test_write_announcements_to_bronze_uploads_parquet(tmp_path, monkeypatch):
     )
     records = [normalize_announcement(_raw_announcement("A", "111111111"))]
 
-    key = write_announcements_to_bronze(records, bucket="lakehouse", work_dir=tmp_path, run_type="diff")
+    key = write_announcements_to_bronze(
+        records, bucket="lakehouse", work_dir=tmp_path, run_type="diff"
+    )
 
     client = boto3.client("s3", region_name="us-east-1")
     obj = client.get_object(Bucket="lakehouse", Key=key)
@@ -568,9 +565,11 @@ git commit -m "feat: orchestrate BODACC bootstrap and diff ingestion"
 - [ ] **Step 1: Write the failing tests**
 
 ```python
+from pyspark.sql.types import StringType, StructField, StructType
+
 from registry.transform.bodacc_to_silver import clean_bodacc_bronze
 
-BRONZE_SCHEMA = [
+BRONZE_COLUMN_NAMES = [
     "id",
     "dateparution",
     "numeroannonce",
@@ -584,14 +583,24 @@ BRONZE_SCHEMA = [
     "denomination",
 ]
 
+BRONZE_SCHEMA = StructType([StructField(name, StringType()) for name in BRONZE_COLUMN_NAMES])
+
 
 def test_clean_bodacc_bronze_types_and_renames_columns(spark_session):
     raw_df = spark_session.createDataFrame(
         [
             (
-                "BX202500012345", "2025-10-15", "12345", "Jugement",
-                "Procedures collectives", "Tribunal de commerce de Paris",
-                "DUPONT BATIMENT SARL", "334393806", "PARIS", "75002", None,
+                "BX202500012345",
+                "2025-10-15",
+                "12345",
+                "Jugement",
+                "Procedures collectives",
+                "Tribunal de commerce de Paris",
+                "DUPONT BATIMENT SARL",
+                "334393806",
+                "PARIS",
+                "75002",
+                None,
             )
         ],
         schema=BRONZE_SCHEMA,
@@ -609,14 +618,30 @@ def test_clean_bodacc_bronze_drops_rows_with_missing_id(spark_session):
     raw_df = spark_session.createDataFrame(
         [
             (
-                "BX202500012345", "2025-10-15", "12345", "Jugement",
-                "Procedures collectives", "Tribunal de commerce de Paris",
-                "DUPONT BATIMENT SARL", "334393806", "PARIS", "75002", None,
+                "BX202500012345",
+                "2025-10-15",
+                "12345",
+                "Jugement",
+                "Procedures collectives",
+                "Tribunal de commerce de Paris",
+                "DUPONT BATIMENT SARL",
+                "334393806",
+                "PARIS",
+                "75002",
+                None,
             ),
             (
-                "", "2025-10-16", "12346", "Jugement",
-                "Procedures collectives", "Tribunal de commerce de Lyon",
-                "MARTIN TRAVAUX SARL", None, "LYON", "69001", None,
+                "",
+                "2025-10-16",
+                "12346",
+                "Jugement",
+                "Procedures collectives",
+                "Tribunal de commerce de Lyon",
+                "MARTIN TRAVAUX SARL",
+                None,
+                "LYON",
+                "69001",
+                None,
             ),
         ],
         schema=BRONZE_SCHEMA,
@@ -626,6 +651,13 @@ def test_clean_bodacc_bronze_drops_rows_with_missing_id(spark_session):
 
     assert [row.id for row in result] == ["BX202500012345"]
 ```
+
+**Note (post-implementation):** the fixture originally used a plain list of column
+names as the schema. That fails with `PySparkValueError: [CANNOT_DETERMINE_TYPE]`
+because `denomination` is `None` in every row — Spark can't infer a type from an
+all-`None` sample column (the same issue Plan 4's seed script hit). Fixed by using
+an explicit all-`StringType` `StructType` instead, matching bronze's actual
+string-typed convention (shown above).
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -695,9 +727,17 @@ def test_bronze_to_silver_writes_cleaned_iceberg_table(spark_session, tmp_path, 
     bronze_df = spark_session.createDataFrame(
         [
             (
-                "BX202500012345", "2025-10-15", "12345", "Jugement",
-                "Procedures collectives", "Tribunal de commerce de Paris",
-                "DUPONT BATIMENT SARL", "334393806", "PARIS", "75002", None,
+                "BX202500012345",
+                "2025-10-15",
+                "12345",
+                "Jugement",
+                "Procedures collectives",
+                "Tribunal de commerce de Paris",
+                "DUPONT BATIMENT SARL",
+                "334393806",
+                "PARIS",
+                "75002",
+                None,
             )
         ],
         schema=BRONZE_SCHEMA,
