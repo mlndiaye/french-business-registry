@@ -38,6 +38,13 @@ def test_extract_siren_from_registre_with_spaces():
     assert extract_siren_from_registre("334 393 806 RCS PARIS") == "334393806"
 
 
+def test_extract_siren_from_registre_accepts_real_api_list_shape():
+    # The real Opendatasoft API returns `registre` as a two-element list
+    # (digits-only, then spaced), not a plain string — discovered in Task 9's
+    # manual verification against the live API.
+    assert extract_siren_from_registre(["108798950", "108 798 950"]) == "108798950"
+
+
 def test_extract_siren_from_registre_without_spaces():
     assert extract_siren_from_registre("334393806 RCS PARIS") == "334393806"
 
@@ -94,6 +101,32 @@ def test_normalize_announcement_prefers_direct_siren_field():
     result = normalize_announcement(raw)
 
     assert result["siren_declared"] == "552032534"
+
+
+def test_normalize_announcement_stringifies_non_string_fields():
+    # The real API returns numeroannonce as an int and registre as a list —
+    # discovered in Task 9's manual verification. normalize_announcement must
+    # produce an all-string dict regardless, since bronze's Parquet schema is
+    # all-string (Task 4).
+    raw = {
+        "id": "A2026016711",
+        "dateparution": "2026-09-02",
+        "numeroannonce": 11,
+        "typeavis_lib": "Avis initial",
+        "familleavis_lib": "Creations",
+        "tribunal": "Greffe du Tribunal de Commerce de Sedan",
+        "commercant": "HAMDAN IBRAHIM ALI, Nazar",
+        "siren": None,
+        "registre": ["108798950", "108 798 950"],
+        "ville": "Charleville-Mezieres",
+        "cp": "08000",
+    }
+
+    result = normalize_announcement(raw)
+
+    assert result["numeroannonce"] == "11"
+    assert result["siren_declared"] == "108798950"
+    assert all(v is None or isinstance(v, str) for v in result.values())
 
 
 @responses.activate

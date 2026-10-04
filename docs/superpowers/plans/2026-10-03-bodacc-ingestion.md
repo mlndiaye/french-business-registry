@@ -29,6 +29,22 @@ here.
 
 ## Decisions made
 
+- **Note (post-implementation, Task 9):** the live API's real shape differed from
+  this plan's reconstruction in two ways. `registre` comes back as a **two-element
+  list** (`["108798950", "108 798 950"]` — digits-only, then spaced), not a plain
+  string, and `numeroannonce` is a real **int**, not a string. Fixed:
+  `extract_siren_from_registre` now takes the list's first element (already the
+  clean digits-only form) rather than joining the list into one string — joining
+  created a false match, since the regex's greedy quantifier bled from the first
+  9-digit run into the redundant spaced repetition that followed it, producing a
+  12-digit (wrong) result instead of failing closed. Separately,
+  `normalize_announcement` now explicitly stringifies every field via a small
+  `_to_str` helper, since `write_announcements_to_bronze`'s all-string Parquet
+  schema raises `ArrowTypeError` on a raw `int` rather than silently coercing it.
+  Also confirmed live: there is no top-level `siren` or `denomination` field in
+  real responses — the `siren` direct-field branch is correct to keep (harmless,
+  just unexercised against this dataset) and `denomination` stays `None` from
+  `commercant` alone, which is what Plan 2 (entity resolution) will match on.
 - **One ingestion module for bootstrap and diff**, not two (contrast with Step 1's
   separate `sirene_bootstrap.py`/`sirene_diff.py`, which genuinely needed to differ
   since one reads a bulk CSV and the other calls a REST API). BODACC bootstrap and
@@ -817,6 +833,12 @@ Compare the printed JSON against what `normalize_announcement` (Task 2) expects
 the dataset slug, endpoint version, or field names differ, update `BODACC_API_URL`
 and/or `normalize_announcement` before proceeding — this was flagged as unverified
 in "Decisions made."
+
+**Result:** the endpoint and most fields matched. Two didn't — `registre` is a
+two-element list, not a string, and `numeroannonce` is an int. See the
+"Note (post-implementation)" at the top of "Decisions made" for the fix (already
+applied to `extract_siren_from_registre` and `normalize_announcement`, with two
+new regression tests) before continuing to Step 2.
 
 - [ ] **Step 2: Run the real 12-month bootstrap**
 

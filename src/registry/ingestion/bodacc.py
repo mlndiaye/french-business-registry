@@ -20,9 +20,11 @@ BODACC_API_URL = (
 )
 
 
-def extract_siren_from_registre(registre: str | None) -> str | None:
+def extract_siren_from_registre(registre: str | list[str] | None) -> str | None:
     if not registre:
         return None
+    if isinstance(registre, list):
+        registre = registre[0]
     match = SIREN_IN_TEXT_PATTERN.search(registre)
     if not match:
         return None
@@ -47,20 +49,26 @@ BODACC_COLUMNS = [
 ]
 
 
+def _to_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
 def normalize_announcement(raw: dict) -> dict:
     siren = raw.get("siren") or extract_siren_from_registre(raw.get("registre"))
     return {
-        "id": raw.get("id"),
-        "dateparution": raw.get("dateparution"),
-        "numeroannonce": raw.get("numeroannonce"),
-        "typeavis_lib": raw.get("typeavis_lib"),
-        "familleavis_lib": raw.get("familleavis_lib"),
-        "tribunal": raw.get("tribunal"),
-        "commercant": raw.get("commercant"),
-        "siren_declared": siren,
-        "ville": raw.get("ville"),
-        "cp": raw.get("cp"),
-        "denomination": raw.get("denomination"),
+        "id": _to_str(raw.get("id")),
+        "dateparution": _to_str(raw.get("dateparution")),
+        "numeroannonce": _to_str(raw.get("numeroannonce")),
+        "typeavis_lib": _to_str(raw.get("typeavis_lib")),
+        "familleavis_lib": _to_str(raw.get("familleavis_lib")),
+        "tribunal": _to_str(raw.get("tribunal")),
+        "commercant": _to_str(raw.get("commercant")),
+        "siren_declared": _to_str(siren),
+        "ville": _to_str(raw.get("ville")),
+        "cp": _to_str(raw.get("cp")),
+        "denomination": _to_str(raw.get("denomination")),
     }
 
 
