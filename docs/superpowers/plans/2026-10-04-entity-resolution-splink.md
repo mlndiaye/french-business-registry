@@ -794,7 +794,18 @@ git commit -m "feat: add deterministic exact-SIREN matching stage"
 - [ ] **Step 1: Write the failing tests**
 
 ```python
+from pyspark.sql.types import StringType, StructField, StructType
+
 from registry.matching.prepare import prepare_bodacc_for_matching, prepare_sirene_for_matching
+
+BODACC_NULL_SCHEMA = StructType(
+    [
+        StructField("id", StringType()),
+        StructField("commercant", StringType()),
+        StructField("code_postal", StringType()),
+        StructField("ville", StringType()),
+    ]
+)
 
 
 def test_prepare_bodacc_for_matching_cleans_and_renames(spark_session):
@@ -813,7 +824,7 @@ def test_prepare_bodacc_for_matching_cleans_and_renames(spark_session):
 def test_prepare_bodacc_for_matching_handles_nulls(spark_session):
     df = spark_session.createDataFrame(
         [("A1", None, None, None)],
-        schema=["id", "commercant", "code_postal", "ville"],
+        schema=BODACC_NULL_SCHEMA,
     )
 
     row = prepare_bodacc_for_matching(df).collect()[0]
@@ -859,10 +870,12 @@ def prepare_bodacc_for_matching(bodacc_df: DataFrame) -> DataFrame:
         F.col("id").alias("uid"),
         F.lower(F.trim(F.coalesce(F.col("commercant"), F.lit("")))).alias("denomination_clean"),
         F.lower(
-            F.concat_ws(
-                " ",
-                F.coalesce(F.col("code_postal"), F.lit("")),
-                F.coalesce(F.col("ville"), F.lit("")),
+            F.trim(
+                F.concat_ws(
+                    " ",
+                    F.coalesce(F.col("code_postal"), F.lit("")),
+                    F.coalesce(F.col("ville"), F.lit("")),
+                )
             )
         ).alias("adresse_clean"),
     )
@@ -873,14 +886,22 @@ def prepare_sirene_for_matching(sirene_candidates_df: DataFrame) -> DataFrame:
         F.col("siret").alias("uid"),
         F.lower(F.trim(F.coalesce(F.col("denomination"), F.lit("")))).alias("denomination_clean"),
         F.lower(
-            F.concat_ws(
-                " ",
-                F.coalesce(F.col("code_postal"), F.lit("")),
-                F.coalesce(F.col("libelle_commune"), F.lit("")),
+            F.trim(
+                F.concat_ws(
+                    " ",
+                    F.coalesce(F.col("code_postal"), F.lit("")),
+                    F.coalesce(F.col("libelle_commune"), F.lit("")),
+                )
             )
         ).alias("adresse_clean"),
     )
 ```
+
+**Note (post-implementation):** the first version omitted the outer `F.trim(...)`
+around `concat_ws`. `concat_ws` only skips true `NULL` arguments — it still joins
+two empty-string arguments *with* the separator, so an all-null row produced
+`" "` (one space) instead of `""`, caught by
+`test_prepare_bodacc_for_matching_handles_nulls`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
