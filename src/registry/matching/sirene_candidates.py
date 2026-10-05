@@ -46,3 +46,32 @@ def normalize_candidate(raw: dict) -> dict:
         "code_postal": adresse.get("codePostalEtablissement"),
         "libelle_commune": adresse.get("libelleCommuneEtablissement"),
     }
+
+
+def fetch_sirene_candidates(api_key: str, department: str, page_size: int = 100) -> list[dict]:
+    records: list[dict] = []
+    curseur = "*"
+    headers = {"X-INSEE-Api-Key-Integration": api_key}
+    query = (
+        f"codePostalEtablissement:{department}* "
+        f"AND etablissementSiege:true "
+        f"AND etatAdministratifEtablissement:A"
+    )
+
+    while True:
+        response = requests.get(
+            SIRENE_API_URL,
+            headers=headers,
+            params={"q": query, "nombre": page_size, "curseur": curseur},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        records.extend(normalize_candidate(e) for e in payload["etablissements"])
+
+        next_curseur = payload["header"]["curseurSuivant"]
+        if next_curseur == curseur:
+            break
+        curseur = next_curseur
+
+    return records
