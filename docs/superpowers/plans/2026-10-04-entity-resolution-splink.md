@@ -992,6 +992,8 @@ what makes this logic testable despite Task 7 having no pytest coverage.
 - [ ] **Step 1: Write the failing tests**
 
 ```python
+from pyspark.sql.types import DoubleType, StringType, StructField, StructType
+
 from registry.matching.combine import (
     best_fuzzy_match_per_announcement,
     combine_match_results,
@@ -1006,6 +1008,15 @@ MATCH_SCHEMA = [
     "match_method",
     "match_confidence",
 ]
+MATCH_SCHEMA_TYPED = StructType(
+    [
+        StructField("bodacc_announcement_id", StringType()),
+        StructField("siren_bodacc", StringType()),
+        StructField("siret_siege", StringType()),
+        StructField("match_method", StringType()),
+        StructField("match_confidence", DoubleType()),
+    ]
+)
 
 
 def test_extract_fuzzy_match_candidates_renames_columns(spark_session):
@@ -1042,7 +1053,7 @@ def test_combine_match_results_unions_exact_and_fuzzy(spark_session):
         [("A1", "552032534", "55203253400019", "exact_siren", 1.0)], schema=MATCH_SCHEMA
     )
     fuzzy_df = spark_session.createDataFrame(
-        [("A2", None, "73282932000014", "splink_fuzzy", 0.8)], schema=MATCH_SCHEMA
+        [("A2", None, "73282932000014", "splink_fuzzy", 0.8)], schema=MATCH_SCHEMA_TYPED
     )
 
     result = combine_match_results(exact_df, fuzzy_df).orderBy("bodacc_announcement_id").collect()
