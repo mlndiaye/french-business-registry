@@ -1,9 +1,18 @@
+import datetime as dt
+import io
+
+import boto3
+import pyarrow.parquet as pq
 import responses
+from moto import mock_aws
 
 from registry.matching.sirene_candidates import (
     SIRENE_API_URL,
+    bronze_object_key,
     fetch_sirene_candidates,
     normalize_candidate,
+    run_candidate_ingestion,
+    write_candidates_to_bronze,
 )
 
 
@@ -119,3 +128,53 @@ def test_fetch_sirene_candidates_follows_pagination_cursor():
     records = fetch_sirene_candidates("test-api-key", "08")
 
     assert [r["siret"] for r in records] == ["12345678900019", "98765432100019"]
+
+
+def test_bronze_object_key_formats_department_and_date():
+    key = bronze_object_key(dt.date(2026, 10, 4), "08")
+
+    assert key == "bronze/sirene_candidates/department=08/ingestion_date=2026-10-04/candidates.parquet"
+
+
+@mock_aws
+def test_write_candidates_to_bronze_uploads_parquet(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.matching.sirene_candidates.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    records = [normalize_candidate(_raw_candidate("12345678900019", "DUPONT BATIMENT"))]
+
+    key = write_candidates_to_bronze(records, bucket="lakehouse", work_dir=tmp_path, department="08")
+
+    client = boto3.client("s3", region_name="us-east-1")
+    obj = client.get_object(Bucket="lakehouse", Key=key)
+    table = pq.read_table(io.BytesIO(obj["Body"].read()))
+    assert table.num_rows == 1
+    assert table.column("siret").to_pylist() == ["12345678900019"]
+
+
+@responses.activate
+@mock_aws
+def test_run_candidate_ingestion_fetches_and_uploads_to_bronze(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "registry.matching.sirene_candidates.get_s3_client",
+        lambda: boto3.client("s3", region_name="us-east-1"),
+    )
+    responses.add(
+        responses.GET,
+        SIRENE_API_URL,
+        json={
+            "header": {"curseur": "*", "curseurSuivant": "*"},
+            "etablissements": [_raw_candidate("12345678900019", "DUPONT BATIMENT")],
+        },
+        status=200,
+    )
+
+    key = run_candidate_ingestion(
+        api_key="test-api-key", bucket="lakehouse", department="08", work_dir=tmp_path
+    )
+
+    client = boto3.client("s3", region_name="us-east-1")
+    obj = client.get_object(Bucket="lakehouse", Key=key)
+    table = pq.read_table(io.BytesIO(obj["Body"].read()))
+    assert table.num_rows == 1

@@ -75,3 +75,30 @@ def fetch_sirene_candidates(api_key: str, department: str, page_size: int = 100)
         curseur = next_curseur
 
     return records
+
+
+def bronze_object_key(ingestion_date: dt.date, department: str) -> str:
+    return (
+        f"bronze/sirene_candidates/department={department}/"
+        f"ingestion_date={ingestion_date.isoformat()}/candidates.parquet"
+    )
+
+
+def write_candidates_to_bronze(
+    records: list[dict], bucket: str, work_dir: Path, department: str
+) -> str:
+    table = pa.Table.from_pylist(
+        records, schema=pa.schema([(name, pa.string()) for name in CANDIDATE_COLUMNS])
+    )
+    parquet_path = work_dir / "candidates.parquet"
+    pq.write_table(table, parquet_path)
+
+    client = get_s3_client()
+    key = bronze_object_key(dt.date.today(), department)
+    upload_file(client, parquet_path, bucket, key)
+    return key
+
+
+def run_candidate_ingestion(api_key: str, bucket: str, department: str, work_dir: Path) -> str:
+    records = fetch_sirene_candidates(api_key, department)
+    return write_candidates_to_bronze(records, bucket, work_dir, department)
