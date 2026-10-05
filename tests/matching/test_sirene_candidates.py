@@ -133,7 +133,9 @@ def test_fetch_sirene_candidates_follows_pagination_cursor():
 def test_bronze_object_key_formats_department_and_date():
     key = bronze_object_key(dt.date(2026, 10, 4), "08")
 
-    assert key == "bronze/sirene_candidates/department=08/ingestion_date=2026-10-04/candidates.parquet"
+    assert (
+        key == "bronze/sirene_candidates/department=08/ingestion_date=2026-10-04/candidates.parquet"
+    )
 
 
 @mock_aws
@@ -144,7 +146,9 @@ def test_write_candidates_to_bronze_uploads_parquet(tmp_path, monkeypatch):
     )
     records = [normalize_candidate(_raw_candidate("12345678900019", "DUPONT BATIMENT"))]
 
-    key = write_candidates_to_bronze(records, bucket="lakehouse", work_dir=tmp_path, department="08")
+    key = write_candidates_to_bronze(
+        records, bucket="lakehouse", work_dir=tmp_path, department="08"
+    )
 
     client = boto3.client("s3", region_name="us-east-1")
     obj = client.get_object(Bucket="lakehouse", Key=key)

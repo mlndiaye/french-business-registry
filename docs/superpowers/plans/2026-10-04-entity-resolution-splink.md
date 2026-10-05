@@ -551,7 +551,9 @@ from registry.matching.sirene_candidates import (
 def test_bronze_object_key_formats_department_and_date():
     key = bronze_object_key(dt.date(2026, 10, 4), "08")
 
-    assert key == "bronze/sirene_candidates/department=08/ingestion_date=2026-10-04/candidates.parquet"
+    assert (
+        key == "bronze/sirene_candidates/department=08/ingestion_date=2026-10-04/candidates.parquet"
+    )
 
 
 @mock_aws
@@ -562,7 +564,9 @@ def test_write_candidates_to_bronze_uploads_parquet(tmp_path, monkeypatch):
     )
     records = [normalize_candidate(_raw_candidate("12345678900019", "DUPONT BATIMENT"))]
 
-    key = write_candidates_to_bronze(records, bucket="lakehouse", work_dir=tmp_path, department="08")
+    key = write_candidates_to_bronze(
+        records, bucket="lakehouse", work_dir=tmp_path, department="08"
+    )
 
     client = boto3.client("s3", region_name="us-east-1")
     obj = client.get_object(Bucket="lakehouse", Key=key)
@@ -662,10 +666,15 @@ git commit -m "feat: land SIRENE matching candidates in bronze as Parquet"
 - [ ] **Step 1: Write the failing tests**
 
 ```python
+from pyspark.sql.types import StringType, StructField, StructType
+
 from registry.matching.exact_siren import exact_siren_matches, unmatched_announcements
 
 BODACC_SCHEMA = ["id", "siren_declared"]
 CANDIDATES_SCHEMA = ["siren", "siret"]
+BODACC_SCHEMA_TYPED = StructType(
+    [StructField("id", StringType()), StructField("siren_declared", StringType())]
+)
 
 
 def test_exact_siren_matches_joins_on_declared_siren(spark_session):
@@ -686,9 +695,7 @@ def test_exact_siren_matches_joins_on_declared_siren(spark_session):
 
 
 def test_exact_siren_matches_ignores_null_siren_declared(spark_session):
-    bodacc_df = spark_session.createDataFrame(
-        [("A1", None)], schema=["id", "siren_declared"]
-    )
+    bodacc_df = spark_session.createDataFrame([("A1", None)], schema=BODACC_SCHEMA_TYPED)
     candidates_df = spark_session.createDataFrame(
         [("552032534", "55203253400019")], schema=CANDIDATES_SCHEMA
     )
@@ -704,13 +711,25 @@ def test_unmatched_announcements_excludes_matched_ids(spark_session):
     )
     exact_matches_df = spark_session.createDataFrame(
         [("A1", "552032534", "55203253400019", "exact_siren", 1.0)],
-        schema=["bodacc_announcement_id", "siren_bodacc", "siret_siege", "match_method", "match_confidence"],
+        schema=[
+            "bodacc_announcement_id",
+            "siren_bodacc",
+            "siret_siege",
+            "match_method",
+            "match_confidence",
+        ],
     )
 
     result = unmatched_announcements(bodacc_df, exact_matches_df).collect()
 
     assert [row.id for row in result] == ["A2"]
 ```
+
+**Note (post-implementation):** a plain column-name schema fails for the
+single-row, all-`None`-in-one-column case (`PySparkValueError:
+[CANNOT_DETERMINE_TYPE]`) — the same issue hit repeatedly since Plan 4 of Step 1.
+`BODACC_SCHEMA_TYPED` (an explicit `StructType`) is only needed for that one test;
+the others infer fine from non-null sample data.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
