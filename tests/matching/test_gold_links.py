@@ -1,4 +1,10 @@
-from registry.matching.gold_links import ensure_gold_links_table, write_matches_to_silver
+import datetime as dt
+
+from registry.matching.gold_links import (
+    apply_links_scd2_merge,
+    ensure_gold_links_table,
+    write_matches_to_silver,
+)
 
 MATCH_SCHEMA = [
     "bodacc_announcement_id",
@@ -34,3 +40,24 @@ def test_ensure_gold_links_table_is_idempotent(spark_session, table_suffix):
     assert "is_current" in columns
     assert "valid_from" in columns
     assert "valid_to" in columns
+
+
+def test_apply_links_scd2_merge_inserts_new_links(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.bodacc_sirene_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.bodacc_sirene_links_{table_suffix}"
+    ensure_gold_links_table(spark_session, gold_table)
+
+    matches_df = spark_session.createDataFrame(
+        [("A1", "552032534", "55203253400019", "exact_siren", 1.0)], schema=MATCH_SCHEMA
+    )
+    write_matches_to_silver(matches_df, silver_table)
+
+    apply_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 6))
+
+    rows = spark_session.table(gold_table).collect()
+    assert len(rows) == 1
+    assert rows[0].bodacc_announcement_id == "A1"
+    assert rows[0].siret_siege == "55203253400019"
+    assert rows[0].is_current is True
+    assert rows[0].valid_from == dt.date(2026, 10, 6)
+    assert rows[0].valid_to is None
