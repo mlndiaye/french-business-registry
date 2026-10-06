@@ -1,5 +1,7 @@
 import datetime as dt
 
+from pyspark.sql.types import DoubleType, StringType, StructField, StructType
+
 from registry.matching.gold_links import (
     apply_links_scd2_merge,
     ensure_gold_links_table,
@@ -13,6 +15,15 @@ MATCH_SCHEMA = [
     "match_method",
     "match_confidence",
 ]
+MATCH_SCHEMA_TYPED = StructType(
+    [
+        StructField("bodacc_announcement_id", StringType()),
+        StructField("siren_bodacc", StringType()),
+        StructField("siret_siege", StringType()),
+        StructField("match_method", StringType()),
+        StructField("match_confidence", DoubleType()),
+    ]
+)
 
 
 def test_write_matches_to_silver_creates_table(spark_session, table_suffix):
@@ -61,3 +72,35 @@ def test_apply_links_scd2_merge_inserts_new_links(spark_session, table_suffix):
     assert rows[0].is_current is True
     assert rows[0].valid_from == dt.date(2026, 10, 6)
     assert rows[0].valid_to is None
+
+
+def test_apply_links_scd2_merge_versions_changed_match(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.bodacc_sirene_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.bodacc_sirene_links_{table_suffix}"
+    ensure_gold_links_table(spark_session, gold_table)
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(
+            [("A1", None, "11111111100019", "splink_fuzzy", 0.75)], schema=MATCH_SCHEMA_TYPED
+        ),
+        silver_table,
+    )
+    apply_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 6))
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(
+            [("A1", "552032534", "55203253400019", "exact_siren", 1.0)], schema=MATCH_SCHEMA
+        ),
+        silver_table,
+    )
+    apply_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 7))
+
+    rows = spark_session.table(gold_table).orderBy("valid_from").collect()
+    assert len(rows) == 2
+    assert rows[0].match_method == "splink_fuzzy"
+    assert rows[0].is_current is False
+    assert rows[0].valid_to == dt.date(2026, 10, 7)
+    assert rows[1].match_method == "exact_siren"
+    assert rows[1].siret_siege == "55203253400019"
+    assert rows[1].is_current is True
+    assert rows[1].valid_to is None
