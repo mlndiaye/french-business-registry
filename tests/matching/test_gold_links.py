@@ -104,3 +104,31 @@ def test_apply_links_scd2_merge_versions_changed_match(spark_session, table_suff
     assert rows[1].siret_siege == "55203253400019"
     assert rows[1].is_current is True
     assert rows[1].valid_to is None
+
+
+def test_apply_links_scd2_merge_ignores_confidence_only_drift(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.bodacc_sirene_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.bodacc_sirene_links_{table_suffix}"
+    ensure_gold_links_table(spark_session, gold_table)
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(
+            [("A1", None, "11111111100019", "splink_fuzzy", 0.650001)], schema=MATCH_SCHEMA_TYPED
+        ),
+        silver_table,
+    )
+    apply_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 6))
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(
+            [("A1", None, "11111111100019", "splink_fuzzy", 0.650002)], schema=MATCH_SCHEMA_TYPED
+        ),
+        silver_table,
+    )
+    apply_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 7))
+
+    rows = spark_session.table(gold_table).collect()
+    assert len(rows) == 1
+    assert rows[0].is_current is True
+    assert rows[0].valid_from == dt.date(2026, 10, 6)
+    assert rows[0].match_confidence == 0.650001
