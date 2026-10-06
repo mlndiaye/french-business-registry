@@ -74,3 +74,15 @@ def apply_links_scd2_merge(
          AND gold.is_current = true
         WHERE gold.bodacc_announcement_id IS NULL
     """)
+
+
+def historize_match_results(
+    spark: SparkSession,
+    matches_df: DataFrame,
+    silver_table: str,
+    gold_table: str,
+    run_date: dt.date,
+) -> None:
+    write_matches_to_silver(matches_df, silver_table)
+    ensure_gold_links_table(spark, gold_table)
+    apply_links_scd2_merge(spark, silver_table, gold_table, run_date)

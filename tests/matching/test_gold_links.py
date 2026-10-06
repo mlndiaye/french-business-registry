@@ -5,6 +5,7 @@ from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 from registry.matching.gold_links import (
     apply_links_scd2_merge,
     ensure_gold_links_table,
+    historize_match_results,
     write_matches_to_silver,
 )
 
@@ -132,3 +133,19 @@ def test_apply_links_scd2_merge_ignores_confidence_only_drift(spark_session, tab
     assert rows[0].is_current is True
     assert rows[0].valid_from == dt.date(2026, 10, 6)
     assert rows[0].match_confidence == 0.650001
+
+
+def test_historize_match_results_creates_table_and_merges(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.bodacc_sirene_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.bodacc_sirene_links_{table_suffix}"
+    matches_df = spark_session.createDataFrame(
+        [("A1", "552032534", "55203253400019", "exact_siren", 1.0)], schema=MATCH_SCHEMA
+    )
+
+    historize_match_results(
+        spark_session, matches_df, silver_table, gold_table, dt.date(2026, 10, 6)
+    )
+
+    rows = spark_session.table(gold_table).collect()
+    assert len(rows) == 1
+    assert rows[0].is_current is True
