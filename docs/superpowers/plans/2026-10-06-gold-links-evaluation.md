@@ -781,7 +781,7 @@ git commit -m "feat: compute precision and recall for the blind-holdout evaluati
 - [ ] **Step 1: Run the full test suite**
 
 Run: `uv run pytest -v`
-Expected: all tests pass, including the pre-existing 62 plus this plan's new ones (4 in `test_combine.py`, 6 in `test_gold_links.py`, 5 in `test_evaluation.py` — net +15, so 77 total).
+Expected: all tests pass. Actual result: 72 passed (62 pre-existing + 1 new in `test_combine.py` + 6 new in `test_gold_links.py` + 3 new in `test_evaluation.py`).
 
 - [ ] **Step 2: Run the linter**
 
