@@ -31,3 +31,19 @@ def best_fuzzy_match_per_announcement(fuzzy_matches_df: DataFrame) -> DataFrame:
 def combine_match_results(exact_matches_df: DataFrame, fuzzy_matches_df: DataFrame) -> DataFrame:
     best_fuzzy_df = best_fuzzy_match_per_announcement(fuzzy_matches_df)
     return exact_matches_df.unionByName(best_fuzzy_df)
+
+
+def resolve_unresolved_matches(bodacc_df: DataFrame, combined_matches_df: DataFrame) -> DataFrame:
+    unresolved_ids = bodacc_df.select(F.col("id").alias("bodacc_announcement_id")).join(
+        combined_matches_df.select("bodacc_announcement_id"),
+        on="bodacc_announcement_id",
+        how="left_anti",
+    )
+    unresolved_df = unresolved_ids.select(
+        F.col("bodacc_announcement_id"),
+        F.lit(None).cast("string").alias("siren_bodacc"),
+        F.lit(None).cast("string").alias("siret_siege"),
+        F.lit("unresolved").alias("match_method"),
+        F.lit(None).cast("double").alias("match_confidence"),
+    )
+    return combined_matches_df.unionByName(unresolved_df)

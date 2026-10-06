@@ -4,6 +4,7 @@ from registry.matching.combine import (
     best_fuzzy_match_per_announcement,
     combine_match_results,
     extract_fuzzy_match_candidates,
+    resolve_unresolved_matches,
 )
 
 PREDICTIONS_SCHEMA = ["uid_l", "uid_r", "match_probability"]
@@ -66,3 +67,23 @@ def test_combine_match_results_unions_exact_and_fuzzy(spark_session):
 
     assert [row.bodacc_announcement_id for row in result] == ["A1", "A2"]
     assert [row.match_method for row in result] == ["exact_siren", "splink_fuzzy"]
+
+
+def test_resolve_unresolved_matches_adds_rows_for_unmatched_announcements(spark_session):
+    bodacc_df = spark_session.createDataFrame([("A1",), ("A2",), ("A3",)], schema=["id"])
+    combined_df = spark_session.createDataFrame(
+        [("A1", "552032534", "55203253400019", "exact_siren", 1.0)], schema=MATCH_SCHEMA
+    )
+
+    result = (
+        resolve_unresolved_matches(bodacc_df, combined_df)
+        .orderBy("bodacc_announcement_id")
+        .collect()
+    )
+
+    assert [row.bodacc_announcement_id for row in result] == ["A1", "A2", "A3"]
+    assert result[0].match_method == "exact_siren"
+    assert result[1].match_method == "unresolved"
+    assert result[1].siret_siege is None
+    assert result[1].match_confidence is None
+    assert result[2].match_method == "unresolved"
