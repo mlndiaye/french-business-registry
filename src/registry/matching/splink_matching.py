@@ -29,7 +29,7 @@ def build_linker(bodacc_prepared, sirene_prepared, db_api):
 
 def train_linker(linker) -> None:
     linker.training.estimate_probability_two_random_records_match([BLOCKING_RULE], recall=0.7)
-    linker.training.estimate_u_using_random_sampling(max_pairs=1e6)
+    linker.training.estimate_u_using_random_sampling(max_pairs=1e6, seed=42)
     linker.training.estimate_parameters_using_expectation_maximisation(BLOCKING_RULE)
 
 
