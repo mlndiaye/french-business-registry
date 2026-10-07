@@ -449,6 +449,7 @@ def bodacc_matching_pipeline():
         candidates_key = os.environ["SIRENE_CANDIDATES_BRONZE_KEY"]
 
         spark = build_lakehouse_session()
+        spark.sparkContext.setCheckpointDir("/tmp/spark-checkpoints")
         try:
             ensure_gold_links_table(spark, gold_table)
 
