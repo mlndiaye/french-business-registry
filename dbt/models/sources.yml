@@ -29,3 +29,28 @@ sources:
             description: True for the single currently-valid version of each establishment.
             tests:
               - not_null
+      - name: bodacc_sirene_links
+        description: >
+          SCD2-historized BODACC/SIRENE entity-resolution results (see
+          docs/superpowers/specs/2026-10-03-bodacc-entity-resolution-design.md and
+          docs/superpowers/plans/2026-10-06-gold-links-evaluation.md).
+          `match_confidence` is deliberately excluded from SCD2 change-detection,
+          so a probabilistic match score drifting slightly between re-runs never
+          opens a spurious new version on its own.
+        columns:
+          - name: bodacc_announcement_id
+            description: Identifier of the BODACC legal announcement being linked.
+            tests:
+              - not_null
+          - name: match_method
+            description: "One of: exact_siren, splink_fuzzy, unresolved."
+            tests:
+              - not_null
+          - name: valid_from
+            description: Date from which this version became valid.
+            tests:
+              - not_null
+          - name: is_current
+            description: True for the single currently-valid version of each announcement.
+            tests:
+              - not_null
