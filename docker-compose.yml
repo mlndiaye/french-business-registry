@@ -55,6 +55,7 @@ services:
       S3_REGION: ${S3_REGION}
       LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET}
       SIRENE_API_KEY: ${SIRENE_API_KEY}
+      SIRENE_CANDIDATES_BRONZE_KEY: ${SIRENE_CANDIDATES_BRONZE_KEY}
     volumes:
       - ./dags:/opt/airflow/dags
     ports:
@@ -78,6 +79,7 @@ services:
       S3_REGION: ${S3_REGION}
       LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET}
       SIRENE_API_KEY: ${SIRENE_API_KEY}
+      SIRENE_CANDIDATES_BRONZE_KEY: ${SIRENE_CANDIDATES_BRONZE_KEY}
     volumes:
       - ./dags:/opt/airflow/dags
     command: scheduler
