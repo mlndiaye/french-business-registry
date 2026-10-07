@@ -5,6 +5,7 @@ from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 from registry.matching.gold_links import (
     apply_links_scd2_merge,
     ensure_gold_links_table,
+    find_unlinked_announcements,
     historize_match_results,
     write_matches_to_silver,
 )
@@ -149,3 +150,15 @@ def test_historize_match_results_creates_table_and_merges(spark_session, table_s
     rows = spark_session.table(gold_table).collect()
     assert len(rows) == 1
     assert rows[0].is_current is True
+
+
+def test_find_unlinked_announcements_excludes_only_current_links(spark_session):
+    bodacc_df = spark_session.createDataFrame([("A1",), ("A2",), ("A3",)], schema=["id"])
+    gold_links_df = spark_session.createDataFrame(
+        [("A1", True), ("A2", False)],
+        schema=["bodacc_announcement_id", "is_current"],
+    )
+
+    result = find_unlinked_announcements(bodacc_df, gold_links_df).orderBy("id").collect()
+
+    assert [row.id for row in result] == ["A2", "A3"]

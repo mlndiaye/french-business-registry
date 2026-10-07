@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime as dt
 
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 
 def write_matches_to_silver(matches_df: DataFrame, silver_table: str) -> None:
@@ -86,3 +87,10 @@ def historize_match_results(
     write_matches_to_silver(matches_df, silver_table)
     ensure_gold_links_table(spark, gold_table)
     apply_links_scd2_merge(spark, silver_table, gold_table, run_date)
+
+
+def find_unlinked_announcements(bodacc_df: DataFrame, gold_links_df: DataFrame) -> DataFrame:
+    current_ids = gold_links_df.filter(F.col("is_current")).select(
+        F.col("bodacc_announcement_id").alias("linked_id")
+    )
+    return bodacc_df.join(current_ids, bodacc_df["id"] == current_ids["linked_id"], "left_anti")
