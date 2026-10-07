@@ -204,7 +204,16 @@ BODACC_LINKS_VIOLATION_ROWS = [
     # is_current=true but valid_to is also set, on a brand-new id (so it does NOT
     # also trip the other two tests) -> violates
     # assert_bodacc_links_valid_to_matches_is_current.
-    ("A4", None, "99999999900001", "splink_fuzzy", 0.6, dt.date(2026, 10, 6), dt.date(2026, 10, 10), True),
+    (
+        "A4",
+        None,
+        "99999999900001",
+        "splink_fuzzy",
+        0.6,
+        dt.date(2026, 10, 6),
+        dt.date(2026, 10, 10),
+        True,
+    ),
 ]
 
 
@@ -241,10 +250,7 @@ def seed(with_violations: bool) -> None:
     spark.createDataFrame(links_rows, schema=BODACC_LINKS_SCHEMA).writeTo(
         BODACC_LINKS_TABLE
     ).append()
-    print(
-        f"Seeded {len(links_rows)} rows into {BODACC_LINKS_TABLE} "
-        f"(violations={with_violations})"
-    )
+    print(f"Seeded {len(links_rows)} rows into {BODACC_LINKS_TABLE} (violations={with_violations})")
 
     spark.stop()
 
