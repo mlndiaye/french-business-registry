@@ -26,7 +26,34 @@ def clean_bodacc_bronze(df: DataFrame) -> DataFrame:
     )
 
 
+def ensure_silver_table(spark: SparkSession, silver_table: str) -> None:
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {silver_table} (
+            id STRING,
+            date_parution DATE,
+            numero_annonce STRING,
+            type_avis STRING,
+            famille_avis STRING,
+            tribunal STRING,
+            commercant STRING,
+            denomination STRING,
+            siren_declared STRING,
+            ville STRING,
+            code_postal STRING
+        ) USING iceberg
+    """)
+
+
 def bronze_to_silver(spark: SparkSession, bronze_path: str, silver_table: str) -> None:
     raw_df = spark.read.parquet(bronze_path)
     clean_df = clean_bodacc_bronze(raw_df)
-    clean_df.writeTo(silver_table).createOrReplace()
+
+    ensure_silver_table(spark, silver_table)
+    clean_df.createOrReplaceTempView("incoming_announcements")
+
+    spark.sql(f"""
+        MERGE INTO {silver_table} AS silver
+        USING incoming_announcements AS incoming
+        ON silver.id = incoming.id
+        WHEN NOT MATCHED THEN INSERT *
+    """)
