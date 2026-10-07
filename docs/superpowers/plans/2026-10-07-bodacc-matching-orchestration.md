@@ -344,12 +344,32 @@ print("Cascade smoke test completed without error.")
 - [ ] **Step 3: Run the smoke test and verify the three expected outcomes**
 
 Run: `uv run python scripts/cascade_smoke_test.py 2>&1 | tail -10`
-Expected: a row for `B1` with `match_method = exact_siren` and `siret_siege = 55203253400019`; a row for `B2` with `match_method = splink_fuzzy` and `siret_siege = 44556677800012`; a row for `B3` with `match_method = unresolved` and `siret_siege = NULL` (no candidate shares its name's first-4-char blocking prefix, so Splink never compares it).
+Expected: a row for `B1` with `match_method = exact_siren` and `siret_siege = 55203253400019`. `B2` and `B3` both land as `match_method = unresolved`: `B3` because no candidate shares its name's first-4-char blocking prefix (never compared); `B2` because, after removing `B1`'s exact match, the fuzzy stage is left with exactly one comparison pair (`B2` vs. its true candidate) — too little volume for Splink's EM training to produce a probability above the 0.5 threshold. This is a real, honest limitation of a 2-candidate toy dataset, not a wiring bug: the script's job is to prove the cascade runs end-to-end without crashing and produces a well-formed combined result, not to prove fuzzy-match accuracy — that's what the real blind-holdout evaluation (Task 7, deferred) measures on real data.
 
-- [ ] **Step 4: Commit**
+**Environment notes discovered while running this** (none were anticipated in the spec — all found empirically, consistent with this project's "verify before committing" practice):
+
+1. PySpark 3.5.3 on Python 3.12 needs `setuptools` installed (provides the `distutils` shim Python 3.12 removed from the stdlib) for Splink's `toPandas()` calls to work. Fixed by `uv add setuptools` (dev dependency).
+2. Splink's `SparkAPI` requires a checkpoint directory (`spark.sparkContext.setCheckpointDir(...)`) — added inline in the smoke test script above, and must be added the same way inside the DAG's matching task in Task 4 (not in `build_lakehouse_session`, since it's a `SparkContext` call, not a session config, and only the one Splink-using task needs it).
+3. Splink's `SparkAPI` needs its bundled similarity-functions jar (`jaro_winkler`, etc.) on the session's classpath, via the `spark.jars` config set at session-build time — this one **is** added to the shared `lakehouse_spark_configs()` (see the extra step below), since `spark.jars` can't be added to an already-running session (unlike `spark.jars.packages`' Maven coordinates, no live "add a local jar" API exists in PySpark), and duplicating the whole lakehouse config dict just for one task would violate DRY.
+
+- [ ] **Step 4: Add Splink's similarity jar to the shared lakehouse Spark config**
+
+Add to `tests/transform/test_spark_session.py`, inside `test_lakehouse_spark_configs_sets_s3a_and_iceberg_catalog`:
+
+```python
+    assert "scala-udf-similarity" in configs["spark.jars"]
+```
+
+Run: `uv run pytest tests/transform/test_spark_session.py -v` — expect FAIL (`KeyError: 'spark.jars'`).
+
+In `src/registry/transform/spark_session.py`, add the import `from splink.backends.spark import similarity_jar_location` and add `"spark.jars": similarity_jar_location(),` to the dict returned by `lakehouse_spark_configs()`.
+
+Run: `uv run pytest tests/transform/test_spark_session.py -v` — expect PASS. Then `uv run pytest -q` to confirm the full suite (75 tests) still passes.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/registry/matching/cascade.py scripts/cascade_smoke_test.py
+git add pyproject.toml uv.lock src/registry/matching/cascade.py scripts/cascade_smoke_test.py src/registry/transform/spark_session.py tests/transform/test_spark_session.py
 git commit -m "feat: wire the full BODACC matching cascade into one callable"
 ```
 
