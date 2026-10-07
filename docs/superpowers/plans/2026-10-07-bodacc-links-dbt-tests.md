@@ -336,18 +336,18 @@ uv run python scripts/seed_dbt_dev_warehouse.py --with-violations
 
 Expected: prints `Seeded 5 rows into lakehouse.gold.sirene_etablissements_historized (violations=True)` then `Seeded 6 rows into lakehouse.gold.bodacc_sirene_links (violations=True)`.
 
-- [ ] **Step 2: Run the full test suite and confirm exactly the 3 new singular tests fail**
+- [ ] **Step 2: Run the full test suite and confirm exactly the singular tests fail**
 
 ```bash
 cd dbt && uv run dbt test --profiles-dir . --target dev
 ```
 
-Expected: all 8 generic `not_null` tests (4 per table) still `PASS`, Plan 4's 3 existing singular tests on `sirene_etablissements_historized` still `PASS` (unaffected — different table), and the 3 new singular tests all `FAIL`:
+**Actual result (corrected from this plan's original prediction):** the `--with-violations` flag is shared by both tables in the unified seed script (Task 2's decision), so this reseeds violations into *both* `sirene_etablissements_historized` and `bodacc_sirene_links` at once — not just the new table. All 8 generic `not_null` tests (4 per table) still `PASS`, and all 6 singular tests `FAIL` (Plan 4's 3 pre-existing ones on `sirene_etablissements_historized`, plus this plan's 3 new ones): `PASS=8 ERROR=6 TOTAL=14`. For the 3 new ones specifically:
 - `assert_bodacc_links_unique_announcement_valid_from` fails with 1 row (the duplicated `(A2, 2026-10-06)` pair).
 - `assert_bodacc_links_one_current_version_per_announcement` fails with 1 row (`A1` now has 2 current versions).
 - `assert_bodacc_links_valid_to_matches_is_current` fails with 1 row (`A4`, `is_current=true` with a non-null `valid_to`).
 
-If any of these 3 unexpectedly passes, its SQL has a bug — fix it before continuing.
+If any of these 6 unexpectedly passes, its SQL has a bug — fix it before continuing.
 
 - [ ] **Step 3: Reseed clean data, leaving the repo in a good state**
 
