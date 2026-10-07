@@ -8,8 +8,16 @@ import datetime as dt
 from pathlib import Path
 
 from pyspark.sql import SparkSession
-from pyspark.sql.types import BooleanType, DateType, StringType, StructField, StructType
+from pyspark.sql.types import (
+    BooleanType,
+    DateType,
+    DoubleType,
+    StringType,
+    StructField,
+    StructType,
+)
 
+from registry.matching.gold_links import ensure_gold_links_table
 from registry.transform.silver_to_gold import ensure_gold_table
 
 # Absolute and anchored on this file's location (not the caller's CWD): Iceberg's
@@ -151,6 +159,54 @@ VIOLATION_ROWS = [
     ),
 ]
 
+BODACC_LINKS_TABLE = "lakehouse.gold.bodacc_sirene_links"
+
+BODACC_LINKS_SCHEMA = StructType(
+    [
+        StructField("bodacc_announcement_id", StringType()),
+        StructField("siren_bodacc", StringType()),
+        StructField("siret_siege", StringType()),
+        StructField("match_method", StringType()),
+        StructField("match_confidence", DoubleType()),
+        StructField("valid_from", DateType()),
+        StructField("valid_to", DateType()),
+        StructField("is_current", BooleanType()),
+    ]
+)
+
+BODACC_LINKS_GOOD_ROWS = [
+    ("A1", "552032534", "55203253400019", "exact_siren", 1.0, dt.date(2026, 10, 6), None, True),
+    ("A2", None, "73282932000014", "splink_fuzzy", 0.87, dt.date(2026, 10, 6), None, True),
+    ("A3", None, None, "unresolved", None, dt.date(2026, 10, 6), None, True),
+]
+
+# Each row below is a deliberate violation of exactly one of the three custom
+# singular dbt tests for gold.bodacc_sirene_links, isolated the same way as
+# VIOLATION_ROWS above.
+BODACC_LINKS_VIOLATION_ROWS = [
+    # Second is_current=true row for an existing bodacc_announcement_id (different
+    # valid_from, so this does NOT also trip the uniqueness test) -> violates
+    # assert_bodacc_links_one_current_version_per_announcement.
+    ("A1", "552032534", "55203253400019", "exact_siren", 1.0, dt.date(2026, 10, 7), None, True),
+    # Duplicate (bodacc_announcement_id, valid_from) for an existing id, closed
+    # (is_current=False, valid_to set — so it does NOT also trip the other two
+    # tests) -> violates assert_bodacc_links_unique_announcement_valid_from.
+    (
+        "A2",
+        None,
+        "73282932000014",
+        "splink_fuzzy",
+        0.87,
+        dt.date(2026, 10, 6),
+        dt.date(2026, 10, 7),
+        False,
+    ),
+    # is_current=true but valid_to is also set, on a brand-new id (so it does NOT
+    # also trip the other two tests) -> violates
+    # assert_bodacc_links_valid_to_matches_is_current.
+    ("A4", None, "99999999900001", "splink_fuzzy", 0.6, dt.date(2026, 10, 6), dt.date(2026, 10, 10), True),
+]
+
 
 def seed(with_violations: bool) -> None:
     spark = (
@@ -175,8 +231,21 @@ def seed(with_violations: bool) -> None:
 
     rows = list(GOOD_ROWS) + (VIOLATION_ROWS if with_violations else [])
     spark.createDataFrame(rows, schema=GOLD_SCHEMA).writeTo(GOLD_TABLE).append()
-
     print(f"Seeded {len(rows)} rows into {GOLD_TABLE} (violations={with_violations})")
+
+    spark.sql(f"DROP TABLE IF EXISTS {BODACC_LINKS_TABLE}")
+    ensure_gold_links_table(spark, BODACC_LINKS_TABLE)
+    links_rows = list(BODACC_LINKS_GOOD_ROWS) + (
+        BODACC_LINKS_VIOLATION_ROWS if with_violations else []
+    )
+    spark.createDataFrame(links_rows, schema=BODACC_LINKS_SCHEMA).writeTo(
+        BODACC_LINKS_TABLE
+    ).append()
+    print(
+        f"Seeded {len(links_rows)} rows into {BODACC_LINKS_TABLE} "
+        f"(violations={with_violations})"
+    )
+
     spark.stop()
 
 
