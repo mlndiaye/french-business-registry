@@ -22,6 +22,7 @@ dev = [
     "moto[s3]>=5.0",
     "responses>=0.25",
     "httpx>=0.27",
+    "setuptools>=84.0.0",
 ]
 
 [build-system]

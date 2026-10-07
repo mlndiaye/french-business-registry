@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 from pyspark.sql import SparkSession
+from splink.backends.spark import similarity_jar_location
 
 ICEBERG_PACKAGE = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1"
 HADOOP_AWS_PACKAGE = "org.apache.hadoop:hadoop-aws:3.3.4"
@@ -15,6 +16,7 @@ def lakehouse_spark_configs() -> dict[str, str]:
     bucket = os.environ["LAKEHOUSE_BUCKET"]
     return {
         "spark.jars.packages": f"{ICEBERG_PACKAGE},{HADOOP_AWS_PACKAGE},{AWS_SDK_PACKAGE}",
+        "spark.jars": similarity_jar_location(),
         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
         "spark.sql.catalog.lakehouse": "org.apache.iceberg.spark.SparkCatalog",
         "spark.sql.catalog.lakehouse.type": "hadoop",
