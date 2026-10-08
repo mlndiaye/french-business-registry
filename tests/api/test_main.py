@@ -118,8 +118,8 @@ def test_history_returns_versions_for_known_siret():
 
 
 def test_annonces_legales_returns_matching_rows():
-    app.dependency_overrides[get_annonces_legales_repository] = (
-        lambda: FakeAnnoncesLegalesRepository([SAMPLE_ANNONCE])
+    app.dependency_overrides[get_annonces_legales_repository] = lambda: (
+        FakeAnnoncesLegalesRepository([SAMPLE_ANNONCE])
     )
     client = TestClient(app)
 
@@ -131,8 +131,8 @@ def test_annonces_legales_returns_matching_rows():
 
 
 def test_annonces_legales_returns_empty_list_for_siret_with_no_announcements():
-    app.dependency_overrides[get_annonces_legales_repository] = (
-        lambda: FakeAnnoncesLegalesRepository([SAMPLE_ANNONCE])
+    app.dependency_overrides[get_annonces_legales_repository] = lambda: (
+        FakeAnnoncesLegalesRepository([SAMPLE_ANNONCE])
     )
     client = TestClient(app)
 
