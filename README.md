@@ -31,3 +31,32 @@ This is Step 1 (Data Engineering) of a three-project portfolio — see
    ```
 
    Then `curl "http://localhost:8000/etablissements/search?q=<siret or commune>"`.
+
+## Step 2: BODACC entity resolution
+
+See `docs/superpowers/specs/2026-10-03-bodacc-entity-resolution-design.md` for the
+design and `docs/superpowers/plans/` (2026-10-03 through 2026-10-08) for the
+implementation plans this was built from.
+
+1. **Ingest**: `registry.ingestion.bodacc` (bootstrap + daily diff) and
+   `registry.matching.sirene_candidates` (department-scoped SIRENE candidates).
+2. **Match and historize**: the `bodacc_matching_pipeline` Airflow DAG runs the
+   exact/fuzzy/unresolved cascade daily against the backlog of unlinked
+   announcements, merging results into `gold.bodacc_sirene_links` (SCD2).
+3. **Test**: `cd dbt && uv run dbt test --profiles-dir . --target prod --select
+   source:lakehouse.bodacc_sirene_links`.
+4. **Evaluate**: `registry.matching.evaluation` runs the blind-holdout
+   precision/recall measurement described in the spec.
+5. **Serve**: sync the joined links+announcements into Postgres and query the API —
+
+   ```bash
+   uv run python -c "
+   from registry.serving.sync_bodacc_links_to_postgres import run_sync
+   from registry.serving.sync_gold_to_postgres import build_sync_session
+   spark = build_sync_session()
+   run_sync(spark)
+   spark.stop()
+   "
+   ```
+
+   Then `curl "http://localhost:8000/etablissements/<siret>/annonces-legales"`.
