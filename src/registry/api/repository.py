@@ -16,6 +16,13 @@ class EtablissementRepository(Protocol):
     def history(self, siret: str) -> list[dict]: ...
 
 
+def _fetch(dsn: str, query: str, params: dict) -> list[dict]:
+    with psycopg2.connect(dsn) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(query, params)
+            return [dict(row) for row in cur.fetchall()]
+
+
 class PostgresEtablissementRepository:
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn
@@ -29,7 +36,7 @@ class PostgresEtablissementRepository:
             ORDER BY siret
             LIMIT 50
         """
-        return self._fetch(query, {"q": q, "pattern": pattern})
+        return _fetch(self._dsn, query, {"q": q, "pattern": pattern})
 
     def history(self, siret: str) -> list[dict]:
         query = f"""
@@ -37,13 +44,27 @@ class PostgresEtablissementRepository:
             WHERE siret = %(siret)s
             ORDER BY valid_from
         """
-        return self._fetch(query, {"siret": siret})
+        return _fetch(self._dsn, query, {"siret": siret})
 
-    def _fetch(self, query: str, params: dict) -> list[dict]:
-        with psycopg2.connect(self._dsn) as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(query, params)
-                return [dict(row) for row in cur.fetchall()]
+
+BODACC_LINKS_POSTGRES_TABLE = "bodacc_annonces_legales"
+
+
+class AnnoncesLegalesRepository(Protocol):
+    def get_by_siret(self, siret: str) -> list[dict]: ...
+
+
+class PostgresAnnoncesLegalesRepository:
+    def __init__(self, dsn: str) -> None:
+        self._dsn = dsn
+
+    def get_by_siret(self, siret: str) -> list[dict]:
+        query = f"""
+            SELECT * FROM {BODACC_LINKS_POSTGRES_TABLE}
+            WHERE siret_siege = %(siret)s AND is_current = true
+            ORDER BY date_parution DESC
+        """
+        return _fetch(self._dsn, query, {"siret": siret})
 
 
 def build_dsn() -> str:
