@@ -8,7 +8,9 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from registry.api.repository import (
+    AnnoncesLegalesRepository,
     EtablissementRepository,
+    PostgresAnnoncesLegalesRepository,
     PostgresEtablissementRepository,
     build_dsn,
 )
@@ -36,8 +38,31 @@ class Etablissement(BaseModel):
     is_current: bool
 
 
+class AnnonceLegale(BaseModel):
+    siret_siege: str
+    bodacc_announcement_id: str
+    siren_bodacc: str | None = None
+    match_method: str
+    match_confidence: float | None = None
+    date_parution: dt.date | None = None
+    type_avis: str | None = None
+    famille_avis: str | None = None
+    tribunal: str | None = None
+    commercant: str | None = None
+    denomination: str | None = None
+    ville: str | None = None
+    code_postal: str | None = None
+    valid_from: dt.date
+    valid_to: dt.date | None = None
+    is_current: bool
+
+
 def get_repository() -> EtablissementRepository:
     return PostgresEtablissementRepository(build_dsn())
+
+
+def get_annonces_legales_repository() -> AnnoncesLegalesRepository:
+    return PostgresAnnoncesLegalesRepository(build_dsn())
 
 
 @app.get("/health")
@@ -58,3 +83,11 @@ def get_history(siret: str, repo: EtablissementRepository = Depends(get_reposito
     if not rows:
         raise HTTPException(status_code=404, detail="Establishment not found")
     return rows
+
+
+@app.get("/etablissements/{siret}/annonces-legales", response_model=list[AnnonceLegale])
+def get_annonces_legales(
+    siret: str,
+    repo: AnnoncesLegalesRepository = Depends(get_annonces_legales_repository),
+) -> list[dict]:
+    return repo.get_by_siret(siret)
