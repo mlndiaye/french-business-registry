@@ -17,3 +17,15 @@ from registry.ingestion.storage import get_s3_client, upload_file
 
 def bronze_object_key(ingestion_date: dt.date) -> str:
     return f"bronze/decp/ingestion_date={ingestion_date.isoformat()}/marches.parquet"
+
+
+def filter_decp_to_scope(parquet_path: Path, department: str, since: dt.date) -> pa.Table:
+    table = pq.read_table(parquet_path)
+    mask = pc.and_(
+        pc.and_(
+            pc.equal(table["acheteur_departement_code"], department),
+            pc.greater_equal(table["datePublicationDonnees"], pa.scalar(since, type=pa.date32())),
+        ),
+        pc.equal(table["donneesActuelles"], True),
+    )
+    return table.filter(mask)

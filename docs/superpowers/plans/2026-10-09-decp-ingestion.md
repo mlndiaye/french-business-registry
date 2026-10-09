@@ -219,13 +219,19 @@ Add to `src/registry/ingestion/decp.py`:
 ```python
 def filter_decp_to_scope(parquet_path: Path, department: str, since: dt.date) -> pa.Table:
     table = pq.read_table(parquet_path)
-    mask = (
-        pc.equal(table["acheteur_departement_code"], department)
-        & pc.greater_equal(table["datePublicationDonnees"], pa.scalar(since, type=pa.date32()))
-        & pc.equal(table["donneesActuelles"], True)
+    mask = pc.and_(
+        pc.and_(
+            pc.equal(table["acheteur_departement_code"], department),
+            pc.greater_equal(table["datePublicationDonnees"], pa.scalar(since, type=pa.date32())),
+        ),
+        pc.equal(table["donneesActuelles"], True),
     )
     return table.filter(mask)
 ```
+
+**Note (post-implementation):** PyArrow's `ChunkedArray` doesn't support Python's
+`&` operator directly (`TypeError: unsupported operand type(s) for &`) — fixed by
+using `pc.and_()` explicitly instead, as shown above.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
