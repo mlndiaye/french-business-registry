@@ -29,3 +29,11 @@ def filter_decp_to_scope(parquet_path: Path, department: str, since: dt.date) ->
         pc.equal(table["donneesActuelles"], True),
     )
     return table.filter(mask)
+
+
+def download_decp_national_file(url: str, dest_path: Path) -> None:
+    with requests.get(url, stream=True, timeout=(10, None)) as response:
+        response.raise_for_status()
+        with open(dest_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                f.write(chunk)

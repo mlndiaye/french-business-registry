@@ -2,8 +2,13 @@ import datetime as dt
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import responses
 
-from registry.ingestion.decp import bronze_object_key, filter_decp_to_scope
+from registry.ingestion.decp import (
+    bronze_object_key,
+    download_decp_national_file,
+    filter_decp_to_scope,
+)
 
 
 def test_bronze_object_key_formats_ingestion_date():
@@ -65,3 +70,14 @@ def test_filter_decp_to_scope_excludes_superseded_modifications(tmp_path):
     result = filter_decp_to_scope(national_path, department="08", since=dt.date(2025, 10, 9))
 
     assert "M4" not in result.column("uid").to_pylist()
+
+
+@responses.activate
+def test_download_decp_national_file_writes_response_body(tmp_path):
+    url = "https://example.test/decp.parquet"
+    responses.add(responses.GET, url, body=b"fake-parquet-bytes", status=200)
+    dest_path = tmp_path / "decp_national.parquet"
+
+    download_decp_national_file(url, dest_path)
+
+    assert dest_path.read_bytes() == b"fake-parquet-bytes"
