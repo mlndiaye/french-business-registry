@@ -7,20 +7,17 @@ from pyspark.sql import functions as F
 
 
 def clean_decp_bronze(df: DataFrame) -> DataFrame:
-    return (
-        df.filter((F.col("uid").isNotNull()) & (F.col("uid") != ""))
-        .select(
-            F.col("uid").alias("uid"),
-            F.col("acheteur_id").alias("acheteur_id"),
-            F.col("acheteur_nom").alias("acheteur_nom"),
-            F.col("titulaire_id").alias("titulaire_id"),
-            F.upper(F.col("titulaire_typeIdentifiant")).alias("titulaire_type_identifiant"),
-            F.col("titulaire_nom").alias("titulaire_nom"),
-            F.col("objet").alias("objet"),
-            F.col("montant").alias("montant"),
-            F.col("codeCPV").alias("code_cpv"),
-            F.col("dateNotification").alias("date_notification"),
-        )
+    return df.filter((F.col("uid").isNotNull()) & (F.col("uid") != "")).select(
+        F.col("uid").alias("uid"),
+        F.col("acheteur_id").alias("acheteur_id"),
+        F.col("acheteur_nom").alias("acheteur_nom"),
+        F.col("titulaire_id").alias("titulaire_id"),
+        F.upper(F.col("titulaire_typeIdentifiant")).alias("titulaire_type_identifiant"),
+        F.col("titulaire_nom").alias("titulaire_nom"),
+        F.col("objet").alias("objet"),
+        F.col("montant").alias("montant"),
+        F.col("codeCPV").alias("code_cpv"),
+        F.col("dateNotification").alias("date_notification"),
     )
 
 
