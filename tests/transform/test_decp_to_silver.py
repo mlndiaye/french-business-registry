@@ -129,3 +129,35 @@ def test_clean_decp_bronze_normalizes_identifiant_case(spark_session):
     row = clean_decp_bronze(raw_df).collect()[0]
 
     assert row.titulaire_type_identifiant == "SIRET"
+
+
+def test_bronze_to_silver_writes_cleaned_iceberg_table(spark_session, tmp_path, table_suffix):
+    bronze_df = spark_session.createDataFrame(
+        [
+            (
+                "M1",
+                "21080096700015",
+                "COMMUNE DE CHARLEVILLE-MEZIERES (MAIRIE)",
+                "98236972000015",
+                "SIRET",
+                "PRIMEURS CHAMPARDENNAIS",
+                "LOT No1",
+                510400.0,
+                "15300000",
+                dt.date(2026, 5, 1),
+                "08",
+                dt.date(2026, 5, 2),
+                True,
+            )
+        ],
+        schema=BRONZE_SCHEMA,
+    )
+    bronze_path = str(tmp_path / "bronze_decp.parquet")
+    bronze_df.write.parquet(bronze_path)
+    silver_table = f"lakehouse.silver.decp_{table_suffix}"
+
+    bronze_to_silver(spark_session, bronze_path, silver_table)
+
+    result = spark_session.table(silver_table).collect()
+    assert len(result) == 1
+    assert result[0].uid == "M1"
