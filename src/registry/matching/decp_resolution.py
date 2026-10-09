@@ -24,3 +24,18 @@ def resolve_decp_titulaires(decp_df: DataFrame) -> DataFrame:
         F.col("objet"),
         F.col("code_cpv"),
     )
+
+
+def validate_against_sirene(resolved_df: DataFrame, sirene_gold_df: DataFrame) -> DataFrame:
+    known_sirets = sirene_gold_df.filter(F.col("is_current")).select(
+        F.col("siret").alias("known_siret")
+    )
+    joined = resolved_df.join(
+        known_sirets,
+        resolved_df["siret_titulaire"] == known_sirets["known_siret"],
+        "left",
+    )
+    return joined.withColumn(
+        "siret_validated_in_sirene",
+        F.when(F.col("siret_titulaire").isNotNull(), F.col("known_siret").isNotNull()),
+    ).drop("known_siret")
