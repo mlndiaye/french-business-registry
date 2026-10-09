@@ -37,3 +37,19 @@ def download_decp_national_file(url: str, dest_path: Path) -> None:
         with open(dest_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 f.write(chunk)
+
+
+def run_ingestion(
+    url: str, bucket: str, department: str, since: dt.date, work_dir: Path
+) -> str:
+    national_path = work_dir / "decp_national.parquet"
+    scoped_path = work_dir / "decp_scoped.parquet"
+
+    download_decp_national_file(url, national_path)
+    scoped_table = filter_decp_to_scope(national_path, department, since)
+    pq.write_table(scoped_table, scoped_path)
+
+    client = get_s3_client()
+    key = bronze_object_key(dt.date.today())
+    upload_file(client, scoped_path, bucket, key)
+    return key
