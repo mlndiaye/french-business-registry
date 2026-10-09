@@ -39,9 +39,7 @@ def download_decp_national_file(url: str, dest_path: Path) -> None:
                 f.write(chunk)
 
 
-def run_ingestion(
-    url: str, bucket: str, department: str, since: dt.date, work_dir: Path
-) -> str:
+def run_ingestion(url: str, bucket: str, department: str, since: dt.date, work_dir: Path) -> str:
     national_path = work_dir / "decp_national.parquet"
     scoped_path = work_dir / "decp_scoped.parquet"
 
