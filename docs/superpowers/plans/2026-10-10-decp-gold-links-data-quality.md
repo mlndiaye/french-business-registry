@@ -911,6 +911,23 @@ these 7 rows have a titulaire name at all). Report the real numbers exactly as
 produced, including the near-zero validation rate — that is the honest,
 explainable state of this environment, not a flaw in this plan.
 
+**Real bug found and fixed while running this step:** the first run of this
+report showed a `SIRET`-typed row inside the *unresolved* breakdown — which
+should be impossible, since `SIRET`-typed rows always resolve. Investigation
+found a real department-08 market (`uid =
+21080372200417202626_302_45110000`) awarded jointly to two titulaires (a
+"groupement"): one resolved via a real SIRET (`GABELLA S.A.`), one not (a
+`TVA`-typed, unnamed co-awardee). `compute_unresolved_composition` joined on
+`uid` alone, so the resolved sibling leaked into the unresolved bucket just for
+sharing a market id. This is exactly the scenario the spec's "Data quality /
+error handling" section flagged as unconfirmed ("this needs confirming against
+real data in the matching plan, not assumed from the one sample inspected
+here") — now confirmed real. Fixed by excluding resolved `(uid, titulaire_id)`
+*pairs* rather than including rows whose `uid` merely appears in the unresolved
+set; a regression test (`test_compute_unresolved_composition_excludes_resolved_sibling_on_shared_uid`)
+reproduces the exact real case. After the fix, the real unresolved breakdown
+was `NULL: 3, TVA: 4` — no `SIRET` row, and the counts sum to 7 as expected.
+
 ---
 
 ## Self-review notes
