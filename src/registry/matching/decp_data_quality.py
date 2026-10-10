@@ -25,3 +25,17 @@ def compute_data_quality_report(validated_df: DataFrame) -> dict:
         "validated_in_sirene": validated_in_sirene,
         "validated_share": validated_in_sirene / resolved if resolved else 0.0,
     }
+
+
+def compute_unresolved_composition(validated_df: DataFrame, decp_df: DataFrame) -> DataFrame:
+    unresolved_ids = validated_df.filter(F.col("match_method") == "unresolved").select("uid")
+    return (
+        decp_df.join(unresolved_ids, on="uid", how="inner")
+        .groupBy("titulaire_type_identifiant")
+        .agg(
+            F.count("*").alias("count"),
+            F.sum(F.when(F.col("titulaire_nom").isNull(), 1).otherwise(0)).alias(
+                "null_nom_count"
+            ),
+        )
+    )

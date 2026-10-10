@@ -761,12 +761,17 @@ def test_compute_unresolved_composition_breaks_down_by_identifiant_type(spark_se
 
     assert len(result) == 2
     assert result[0].titulaire_type_identifiant is None
-    assert result[0].count == 1
+    assert result[0]["count"] == 1
     assert result[0].null_nom_count == 1
     assert result[1].titulaire_type_identifiant == "TVA"
-    assert result[1].count == 1
+    assert result[1]["count"] == 1
     assert result[1].null_nom_count == 1
 ```
+
+**Note (post-implementation):** use `result[0]["count"]`, not `result[0].count`
+— PySpark's `Row` inherits a built-in `count()` method (for counting value
+occurrences in the row's tuple), which shadows attribute access for a column
+literally named `count`. Dict-style indexing avoids the collision.
 
 - [ ] **Step 2: Run test to verify it fails**
 
