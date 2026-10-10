@@ -91,3 +91,60 @@ def test_apply_decp_links_scd2_merge_inserts_new_links(spark_session, table_suff
     assert rows[0].is_current is True
     assert rows[0].valid_from == dt.date(2026, 10, 10)
     assert rows[0].valid_to is None
+
+
+def test_apply_decp_links_scd2_merge_versions_changed_amount(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.decp_marches_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.decp_marches_links_{table_suffix}"
+    ensure_gold_decp_links_table(spark_session, gold_table)
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(
+            [
+                (
+                    "M1",
+                    "98236972000015",
+                    "source_siret",
+                    False,
+                    "21080096700015",
+                    "COMMUNE DE CHARLEVILLE-MEZIERES",
+                    510400.0,
+                    "LOT No1",
+                    "15300000",
+                )
+            ],
+            schema=MATCH_SCHEMA,
+        ),
+        silver_table,
+    )
+    apply_decp_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 10))
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(
+            [
+                (
+                    "M1",
+                    "98236972000015",
+                    "source_siret",
+                    False,
+                    "21080096700015",
+                    "COMMUNE DE CHARLEVILLE-MEZIERES",
+                    600000.0,
+                    "LOT No1",
+                    "15300000",
+                )
+            ],
+            schema=MATCH_SCHEMA,
+        ),
+        silver_table,
+    )
+    apply_decp_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 11))
+
+    rows = spark_session.table(gold_table).orderBy("valid_from").collect()
+    assert len(rows) == 2
+    assert rows[0].montant == 510400.0
+    assert rows[0].is_current is False
+    assert rows[0].valid_to == dt.date(2026, 10, 11)
+    assert rows[1].montant == 600000.0
+    assert rows[1].is_current is True
+    assert rows[1].valid_to is None
