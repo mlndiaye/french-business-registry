@@ -56,6 +56,7 @@ services:
       LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET}
       SIRENE_API_KEY: ${SIRENE_API_KEY}
       SIRENE_CANDIDATES_BRONZE_KEY: ${SIRENE_CANDIDATES_BRONZE_KEY}
+      DECP_PARQUET_URL: ${DECP_PARQUET_URL}
     volumes:
       - ./dags:/opt/airflow/dags
     ports:
@@ -80,6 +81,7 @@ services:
       LAKEHOUSE_BUCKET: ${LAKEHOUSE_BUCKET}
       SIRENE_API_KEY: ${SIRENE_API_KEY}
       SIRENE_CANDIDATES_BRONZE_KEY: ${SIRENE_CANDIDATES_BRONZE_KEY}
+      DECP_PARQUET_URL: ${DECP_PARQUET_URL}
     volumes:
       - ./dags:/opt/airflow/dags
     command: scheduler
