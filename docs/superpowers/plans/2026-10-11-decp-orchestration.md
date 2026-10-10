@@ -426,6 +426,38 @@ spark.stop()
 
 Expected: a row count in the same ballpark as Plans 1-3's manual runs (~1,293).
 
+**Second real, pre-existing bug found while running this step:** after fixing
+the Airflow image build, `extract_decp` still failed —
+`botocore.exceptions.EndpointConnectionError: Could not connect to the
+endpoint URL: "http://localhost:3900/lakehouse"`. `docker-compose.yml`'s
+Airflow services passed through `${S3_ENDPOINT_URL}` from `.env`
+(`http://localhost:3900`), which is correct for host-side `uv run` scripts but
+wrong inside a container: `localhost` there means the container itself, not
+the host where Garage's port is mapped. Every DAG in this project
+(`sirene_daily_pipeline`, `bodacc_matching_pipeline`, and this one) shares this
+same latent bug — none had ever actually been run inside a live container
+before this plan's Task 3/5. Fixed by hardcoding
+`S3_ENDPOINT_URL: http://garage:3900` (the Compose network's service name, a
+fixed topology fact, not a per-environment secret) directly in both Airflow
+services' `environment:` blocks in `docker-compose.yml`, replacing the
+`${S3_ENDPOINT_URL}` passthrough.
+
+- [ ] **Step 4 (added): Commit this second fix**
+
+```bash
+git add docker-compose.yml docs/superpowers/plans/2026-10-11-decp-orchestration.md
+git commit -m "fix: use the Compose service name for Garage inside Airflow containers"
+```
+
+- [ ] **Step 5 (added): Recreate the containers and re-trigger**
+
+```bash
+docker compose up -d airflow-webserver airflow-scheduler
+docker compose exec airflow-webserver airflow dags trigger decp_matching_pipeline
+```
+
+Poll and verify as in Steps 2-3 above.
+
 ---
 
 ## Self-review notes
