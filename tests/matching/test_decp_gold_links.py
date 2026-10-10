@@ -1,4 +1,10 @@
-from registry.matching.decp_gold_links import ensure_gold_decp_links_table, write_matches_to_silver
+import datetime as dt
+
+from registry.matching.decp_gold_links import (
+    apply_decp_links_scd2_merge,
+    ensure_gold_decp_links_table,
+    write_matches_to_silver,
+)
 
 MATCH_SCHEMA = [
     "uid",
@@ -51,3 +57,37 @@ def test_ensure_gold_decp_links_table_is_idempotent(spark_session, table_suffix)
     assert "is_current" in columns
     assert "valid_from" in columns
     assert "valid_to" in columns
+
+
+def test_apply_decp_links_scd2_merge_inserts_new_links(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.decp_marches_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.decp_marches_links_{table_suffix}"
+    ensure_gold_decp_links_table(spark_session, gold_table)
+
+    matches_df = spark_session.createDataFrame(
+        [
+            (
+                "M1",
+                "98236972000015",
+                "source_siret",
+                False,
+                "21080096700015",
+                "COMMUNE DE CHARLEVILLE-MEZIERES",
+                510400.0,
+                "LOT No1",
+                "15300000",
+            )
+        ],
+        schema=MATCH_SCHEMA,
+    )
+    write_matches_to_silver(matches_df, silver_table)
+
+    apply_decp_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 10))
+
+    rows = spark_session.table(gold_table).collect()
+    assert len(rows) == 1
+    assert rows[0].uid == "M1"
+    assert rows[0].siret_titulaire == "98236972000015"
+    assert rows[0].is_current is True
+    assert rows[0].valid_from == dt.date(2026, 10, 10)
+    assert rows[0].valid_to is None
