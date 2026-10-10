@@ -640,14 +640,20 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
-    { name = "dbt-spark", extra = ["session"] },
-    { name = "fastapi" },
-    { name = "psycopg2-binary" },
     { name = "pyarrow" },
     { name = "pyspark" },
     { name = "requests" },
     { name = "splink" },
+]
+
+[package.optional-dependencies]
+api = [
+    { name = "fastapi" },
+    { name = "psycopg2-binary" },
     { name = "uvicorn", extra = ["standard"] },
+]
+dbt = [
+    { name = "dbt-spark", extra = ["session"] },
 ]
 
 [package.dev-dependencies]
@@ -663,15 +669,16 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.34" },
-    { name = "dbt-spark", extras = ["session"], specifier = ">=1.11,<1.12" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "psycopg2-binary", specifier = ">=2.9" },
+    { name = "dbt-spark", extras = ["session"], marker = "extra == 'dbt'", specifier = ">=1.11,<1.12" },
+    { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.115" },
+    { name = "psycopg2-binary", marker = "extra == 'api'", specifier = ">=2.9" },
     { name = "pyarrow", specifier = ">=16.0" },
     { name = "pyspark", specifier = "==3.5.3" },
     { name = "requests", specifier = ">=2.31" },
     { name = "splink", specifier = ">=4.0,<5.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'api'", specifier = ">=0.30" },
 ]
+provides-extras = ["dbt", "api"]
 
 [package.metadata.requires-dev]
 dev = [

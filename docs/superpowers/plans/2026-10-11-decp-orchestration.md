@@ -291,6 +291,143 @@ outcome is correct; report whichever actually happens.
 
 ---
 
+### Task 4: Fix the Airflow image's dependency installation (discovered while running Task 3)
+
+**Files:**
+- Modify: `pyproject.toml`
+- Modify: `README.md` (if it documents a local install command)
+
+**Real, pre-existing bug found during Task 3** (not caused by this plan): the
+Airflow image has been unbuildable since Step 1 Plan 4 added `dbt-spark` — its
+transitive dependency `dbt-adapters` requires `protobuf>=6.0,<7.0`, while
+Airflow 2.10.3's own pinned constraints file requires `protobuf==4.25.5`.
+`Dockerfile.airflow`'s `pip install /opt/airflow/project` installs the
+project's *entire* dependency list, including packages no DAG ever imports
+(`dbt-spark`, `fastapi`, `uvicorn[standard]`, `psycopg2-binary` — all used only
+by the separate `dbt` CLI and the FastAPI serving layer, never inside a DAG).
+This was never caught before because nobody had rebuilt the Airflow image
+since `dbt-spark` was added — the previously-running containers predated it.
+
+- [ ] **Step 1: Split `pyproject.toml`'s dependencies into a minimal base plus optional extras**
+
+Replace in `pyproject.toml`:
+
+```toml
+dependencies = [
+    "boto3>=1.34",
+    "pyarrow>=16.0",
+    "requests>=2.31",
+    "pyspark==3.5.3",
+    "dbt-spark[session]>=1.11,<1.12",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "psycopg2-binary>=2.9",
+    "splink>=4.0,<5.0",
+]
+```
+
+with:
+
+```toml
+dependencies = [
+    "boto3>=1.34",
+    "pyarrow>=16.0",
+    "requests>=2.31",
+    "pyspark==3.5.3",
+    "splink>=4.0,<5.0",
+]
+
+[project.optional-dependencies]
+dbt = ["dbt-spark[session]>=1.11,<1.12"]
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "psycopg2-binary>=2.9"]
+```
+
+The base `dependencies` list is exactly what every Airflow DAG actually
+imports (`boto3`, `pyarrow`, `requests`, `pyspark`, `splink` — the last via
+`bodacc_matching_pipeline`'s cascade). `Dockerfile.airflow`'s existing
+`pip install /opt/airflow/project` needs no changes — installing without
+naming any extras already skips `dbt`/`api` automatically; the fix is entirely
+in what `pyproject.toml` now classifies as a base dependency vs. an extra.
+
+- [ ] **Step 2: Update the local dev install command**
+
+Local development needs both extras (tests import `fastapi`/`httpx`; the dbt
+plans' documented commands invoke `dbt` as a CLI tool). Run:
+
+```bash
+uv sync --all-groups --all-extras
+```
+
+Check `README.md` for any documented install command and update it to include
+`--all-extras` if present.
+
+- [ ] **Step 3: Verify local dev still works**
+
+```bash
+uv run pytest -v
+uv run ruff check . && uv run ruff format --check src/ tests/ scripts/
+```
+
+Expected: all 104 tests still pass, lint clean — this change only affects
+*how* dependencies are grouped, not which versions are installed locally.
+
+- [ ] **Step 4: Rebuild the Airflow images and confirm they build**
+
+```bash
+set -a && source .env && set +a
+docker compose build airflow-init airflow-webserver airflow-scheduler
+```
+
+Expected: builds successfully this time — no `protobuf` resolution conflict.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add pyproject.toml uv.lock README.md
+git commit -m "fix: exclude dbt-spark and API deps from the Airflow image"
+```
+
+---
+
+### Task 5: Re-run Task 3's manual verification with the fixed image
+
+**Files:** none (manual verification only)
+
+- [ ] **Step 1: Restart the full stack with the rebuilt images**
+
+```bash
+docker compose up -d airflow-init
+docker compose up -d airflow-webserver airflow-scheduler
+```
+
+- [ ] **Step 2: Trigger the DAG and confirm success**
+
+```bash
+docker compose exec airflow-webserver airflow dags trigger decp_matching_pipeline
+docker compose exec airflow-webserver airflow dags list-runs -d decp_matching_pipeline --no-backfill
+```
+
+Expected: the run's `state` column reads `success` this time. If a task fails,
+find its log file under `/opt/airflow/logs/dag_id=.../task_id=.../attempt=1.log`
+inside the `airflow-scheduler` container (the CLI's `airflow tasks logs`
+subcommand does not exist in this Airflow version — use `find`/`cat` on that
+path directly, not the command the earlier draft of this task assumed).
+
+- [ ] **Step 3: Verify the real gold table result**
+
+```bash
+uv run python -c "
+from registry.transform.spark_session import build_lakehouse_session
+spark = build_lakehouse_session()
+print('gold row count:', spark.table('lakehouse.gold.decp_marches_links').count())
+spark.stop()
+"
+```
+
+Expected: a row count in the same ballpark as Plans 1-3's manual runs (~1,293).
+
+---
+
 ## Self-review notes
 
 - **Spec coverage:** the spec's full data flow (ingest → silver → resolve →

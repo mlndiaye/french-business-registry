@@ -8,12 +8,12 @@ dependencies = [
     "pyarrow>=16.0",
     "requests>=2.31",
     "pyspark==3.5.3",
-    "dbt-spark[session]>=1.11,<1.12",
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "psycopg2-binary>=2.9",
     "splink>=4.0,<5.0",
 ]
+
+[project.optional-dependencies]
+dbt = ["dbt-spark[session]>=1.11,<1.12"]
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.30", "psycopg2-binary>=2.9"]
 
 [dependency-groups]
 dev = [
