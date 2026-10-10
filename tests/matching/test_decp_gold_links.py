@@ -229,9 +229,7 @@ def test_historize_decp_links_creates_table_and_merges(spark_session, table_suff
         schema=MATCH_SCHEMA,
     )
 
-    historize_decp_links(
-        spark_session, matches_df, silver_table, gold_table, dt.date(2026, 10, 10)
-    )
+    historize_decp_links(spark_session, matches_df, silver_table, gold_table, dt.date(2026, 10, 10))
 
     rows = spark_session.table(gold_table).collect()
     assert len(rows) == 1

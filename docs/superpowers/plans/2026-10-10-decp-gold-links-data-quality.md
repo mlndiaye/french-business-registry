@@ -818,8 +818,8 @@ git commit -m "feat: break down unresolved DECP markets by identifier type"
 - [ ] **Step 1: Run the full test suite**
 
 Run: `uv run pytest -v`
-Expected: all tests pass (94 pre-existing + 6 in `test_decp_gold_links.py` + 5 in
-`test_decp_data_quality.py` = 105).
+Expected: all tests pass. Actual result: 103 passed (94 pre-existing + 6 in
+`test_decp_gold_links.py` + 3 in `test_decp_data_quality.py`).
 
 - [ ] **Step 2: Run the linter**
 

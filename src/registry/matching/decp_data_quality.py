@@ -34,8 +34,6 @@ def compute_unresolved_composition(validated_df: DataFrame, decp_df: DataFrame) 
         .groupBy("titulaire_type_identifiant")
         .agg(
             F.count("*").alias("count"),
-            F.sum(F.when(F.col("titulaire_nom").isNull(), 1).otherwise(0)).alias(
-                "null_nom_count"
-            ),
+            F.sum(F.when(F.col("titulaire_nom").isNull(), 1).otherwise(0)).alias("null_nom_count"),
         )
     )
