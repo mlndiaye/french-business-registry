@@ -3,6 +3,7 @@ import datetime as dt
 from registry.matching.decp_gold_links import (
     apply_decp_links_scd2_merge,
     ensure_gold_decp_links_table,
+    historize_decp_links,
     write_matches_to_silver,
 )
 
@@ -206,3 +207,32 @@ def test_apply_decp_links_scd2_merge_ignores_validation_flag_only_drift(
     assert rows[0].is_current is True
     assert rows[0].valid_from == dt.date(2026, 10, 10)
     assert rows[0].siret_validated_in_sirene is False
+
+
+def test_historize_decp_links_creates_table_and_merges(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.decp_marches_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.decp_marches_links_{table_suffix}"
+    matches_df = spark_session.createDataFrame(
+        [
+            (
+                "M1",
+                "98236972000015",
+                "source_siret",
+                False,
+                "21080096700015",
+                "COMMUNE DE CHARLEVILLE-MEZIERES",
+                510400.0,
+                "LOT No1",
+                "15300000",
+            )
+        ],
+        schema=MATCH_SCHEMA,
+    )
+
+    historize_decp_links(
+        spark_session, matches_df, silver_table, gold_table, dt.date(2026, 10, 10)
+    )
+
+    rows = spark_session.table(gold_table).collect()
+    assert len(rows) == 1
+    assert rows[0].is_current is True
