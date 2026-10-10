@@ -508,6 +508,17 @@ time after this one succeeds, and confirm the gold row count is unchanged
 (proving the composite-key fix actually resolves the real crash, not just the
 synthetic regression test).
 
+**Actual result:** both runs succeeded. First run (`manual__2026-10-10T18:50:58+00:00`):
+`gold.decp_marches_links` landed 1,287 rows (1,280 `source_siret` + 7
+`unresolved` — the count differs slightly from Plans 1-3's earlier manual runs
+because the trailing 12-month window had moved forward another day by this
+point, exactly as documented in Plan 1). Second run
+(`manual__2026-10-10T18:54:35+00:00`, triggered immediately after, same
+scope): still 1,287 total rows, 1,287 current rows — no duplicate versions, no
+crash. The `(uid, titulaire_id)` composite-key fix holds against the real
+joint-award market on a genuine repeat run, not just the synthetic regression
+test added alongside the fix.
+
 ---
 
 ## Self-review notes
@@ -523,3 +534,13 @@ synthetic regression test).
   (`lakehouse.silver.decp_marches`, `lakehouse.silver.decp_marches_links`,
   `lakehouse.gold.decp_marches_links`) match what Plans 1-3's own manual
   verifications already used.
+- **What this plan's manual verification actually proved:** three real,
+  pre-existing bugs, none of them hypothetical — an Airflow image that had
+  been unbuildable since Step 1 Plan 4, a Docker networking assumption that
+  had never been exercised by any DAG in the project, and a gold-table key
+  that was too narrow for data this project had already ingested for real.
+  None of these were caught by unit tests or by Plans 1-3's own manual
+  verifications, because none of those ran this code *as Airflow actually
+  runs it, twice, against real data*. That is exactly the gap this plan's
+  Task 3/5 closed, and the reason "attempt it for real" was worth the extra
+  effort over trusting the underlying functions' own prior verifications.
