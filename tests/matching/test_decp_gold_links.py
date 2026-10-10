@@ -1,4 +1,4 @@
-from registry.matching.decp_gold_links import write_matches_to_silver
+from registry.matching.decp_gold_links import ensure_gold_decp_links_table, write_matches_to_silver
 
 MATCH_SCHEMA = [
     "uid",
@@ -37,3 +37,17 @@ def test_write_matches_to_silver_creates_table(spark_session, table_suffix):
     rows = spark_session.table(silver_table).collect()
     assert len(rows) == 1
     assert rows[0].siret_titulaire == "98236972000015"
+
+
+def test_ensure_gold_decp_links_table_is_idempotent(spark_session, table_suffix):
+    gold_table = f"lakehouse.gold.decp_marches_links_{table_suffix}"
+
+    ensure_gold_decp_links_table(spark_session, gold_table)
+    ensure_gold_decp_links_table(spark_session, gold_table)
+
+    columns = [field.name for field in spark_session.table(gold_table).schema]
+    assert "uid" in columns
+    assert "siret_validated_in_sirene" in columns
+    assert "is_current" in columns
+    assert "valid_from" in columns
+    assert "valid_to" in columns
