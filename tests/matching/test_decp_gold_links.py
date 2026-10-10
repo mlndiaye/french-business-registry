@@ -9,6 +9,7 @@ from registry.matching.decp_gold_links import (
 
 MATCH_SCHEMA = [
     "uid",
+    "titulaire_id",
     "siret_titulaire",
     "match_method",
     "siret_validated_in_sirene",
@@ -26,6 +27,7 @@ def test_write_matches_to_silver_creates_table(spark_session, table_suffix):
         [
             (
                 "M1",
+                "98236972000015",
                 "98236972000015",
                 "source_siret",
                 False,
@@ -54,6 +56,7 @@ def test_ensure_gold_decp_links_table_is_idempotent(spark_session, table_suffix)
 
     columns = [field.name for field in spark_session.table(gold_table).schema]
     assert "uid" in columns
+    assert "titulaire_id" in columns
     assert "siret_validated_in_sirene" in columns
     assert "is_current" in columns
     assert "valid_from" in columns
@@ -69,6 +72,7 @@ def test_apply_decp_links_scd2_merge_inserts_new_links(spark_session, table_suff
         [
             (
                 "M1",
+                "98236972000015",
                 "98236972000015",
                 "source_siret",
                 False,
@@ -105,6 +109,7 @@ def test_apply_decp_links_scd2_merge_versions_changed_amount(spark_session, tabl
                 (
                     "M1",
                     "98236972000015",
+                    "98236972000015",
                     "source_siret",
                     False,
                     "21080096700015",
@@ -125,6 +130,7 @@ def test_apply_decp_links_scd2_merge_versions_changed_amount(spark_session, tabl
             [
                 (
                     "M1",
+                    "98236972000015",
                     "98236972000015",
                     "source_siret",
                     False,
@@ -164,6 +170,7 @@ def test_apply_decp_links_scd2_merge_ignores_validation_flag_only_drift(
                 (
                     "M1",
                     "98236972000015",
+                    "98236972000015",
                     "source_siret",
                     False,
                     "21080096700015",
@@ -187,6 +194,7 @@ def test_apply_decp_links_scd2_merge_ignores_validation_flag_only_drift(
                 (
                     "M1",
                     "98236972000015",
+                    "98236972000015",
                     "source_siret",
                     True,
                     "21080096700015",
@@ -209,6 +217,62 @@ def test_apply_decp_links_scd2_merge_ignores_validation_flag_only_drift(
     assert rows[0].siret_validated_in_sirene is False
 
 
+def test_apply_decp_links_scd2_merge_handles_joint_award_on_shared_uid(spark_session, table_suffix):
+    # Real department-08 case: one market uid, two titulaires (a "groupement").
+    # Before the (uid, titulaire_id) composite key fix, a second run against
+    # already-historized data hit Spark's MERGE_CARDINALITY_VIOLATION here.
+    gold_table = f"lakehouse.gold.decp_marches_links_{table_suffix}"
+    silver_table = f"lakehouse.silver.decp_marches_links_{table_suffix}"
+    ensure_gold_decp_links_table(spark_session, gold_table)
+
+    joint_award_rows = [
+        (
+            "M1",
+            "68628001700035",
+            "68628001700035",
+            "source_siret",
+            False,
+            "21080372200417",
+            "COMMUNE DE CHARLEVILLE-MEZIERES",
+            510400.0,
+            "LOT No1",
+            "45110000",
+        ),
+        (
+            "M1",
+            "999999999",
+            None,
+            "unresolved",
+            None,
+            "21080372200417",
+            "COMMUNE DE CHARLEVILLE-MEZIERES",
+            510400.0,
+            "LOT No1",
+            "45110000",
+        ),
+    ]
+
+    write_matches_to_silver(
+        spark_session.createDataFrame(joint_award_rows, schema=MATCH_SCHEMA), silver_table
+    )
+    apply_decp_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 10))
+
+    # Second run with identical data — this is exactly what previously crashed.
+    write_matches_to_silver(
+        spark_session.createDataFrame(joint_award_rows, schema=MATCH_SCHEMA), silver_table
+    )
+    apply_decp_links_scd2_merge(spark_session, silver_table, gold_table, dt.date(2026, 10, 11))
+
+    rows = spark_session.table(gold_table).orderBy("titulaire_id").collect()
+    assert len(rows) == 2
+    assert rows[0].titulaire_id == "68628001700035"
+    assert rows[0].is_current is True
+    assert rows[0].valid_from == dt.date(2026, 10, 10)
+    assert rows[1].titulaire_id == "999999999"
+    assert rows[1].match_method == "unresolved"
+    assert rows[1].is_current is True
+
+
 def test_historize_decp_links_creates_table_and_merges(spark_session, table_suffix):
     gold_table = f"lakehouse.gold.decp_marches_links_{table_suffix}"
     silver_table = f"lakehouse.silver.decp_marches_links_{table_suffix}"
@@ -216,6 +280,7 @@ def test_historize_decp_links_creates_table_and_merges(spark_session, table_suff
         [
             (
                 "M1",
+                "98236972000015",
                 "98236972000015",
                 "source_siret",
                 False,

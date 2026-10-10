@@ -1,6 +1,12 @@
 """SCD2 historization of resolved/validated DECP markets into
 `gold.decp_marches_links`, following the exact same two-statement MERGE+INSERT
-pattern as `gold_links.py` (BODACC) and `silver_to_gold.py` (SIRENE)."""
+pattern as `gold_links.py` (BODACC) and `silver_to_gold.py` (SIRENE).
+
+Keyed on `(uid, titulaire_id)`, not `uid` alone: a single market can be
+jointly awarded to more than one titulaire (confirmed in real department-08
+data), so `uid` by itself isn't a unique row. `titulaire_id` can be null for
+some unresolved rows, so the merge's join conditions use null-safe `<=>`
+rather than `=` there."""
 
 from __future__ import annotations
 
@@ -17,6 +23,7 @@ def ensure_gold_decp_links_table(spark: SparkSession, gold_table: str) -> None:
     spark.sql(f"""
         CREATE TABLE IF NOT EXISTS {gold_table} (
             uid STRING,
+            titulaire_id STRING,
             siret_titulaire STRING,
             match_method STRING,
             siret_validated_in_sirene BOOLEAN,
@@ -43,10 +50,11 @@ def apply_decp_links_scd2_merge(
     comparison = " AND ".join(f"incoming_links.{c} <=> gold.{c}" for c in TRACKED_COLUMNS)
 
     changed_links = spark.sql(f"""
-        SELECT incoming_links.uid
+        SELECT incoming_links.uid, incoming_links.titulaire_id
         FROM incoming_links
         JOIN {gold_table} AS gold
           ON incoming_links.uid = gold.uid
+         AND incoming_links.titulaire_id <=> gold.titulaire_id
          AND gold.is_current = true
         WHERE NOT ({comparison})
     """)
@@ -55,7 +63,7 @@ def apply_decp_links_scd2_merge(
     spark.sql(f"""
         MERGE INTO {gold_table} AS gold
         USING changed_links AS c
-        ON gold.uid = c.uid AND gold.is_current = true
+        ON gold.uid = c.uid AND gold.titulaire_id <=> c.titulaire_id AND gold.is_current = true
         WHEN MATCHED THEN UPDATE SET
             gold.valid_to = DATE('{run_date.isoformat()}'),
             gold.is_current = false
@@ -65,6 +73,7 @@ def apply_decp_links_scd2_merge(
         INSERT INTO {gold_table}
         SELECT
             incoming_links.uid,
+            incoming_links.titulaire_id,
             incoming_links.siret_titulaire,
             incoming_links.match_method,
             incoming_links.siret_validated_in_sirene,
@@ -79,6 +88,7 @@ def apply_decp_links_scd2_merge(
         FROM incoming_links
         LEFT JOIN {gold_table} AS gold
           ON incoming_links.uid = gold.uid
+         AND incoming_links.titulaire_id <=> gold.titulaire_id
          AND gold.is_current = true
         WHERE gold.uid IS NULL
     """)

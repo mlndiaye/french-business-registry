@@ -458,6 +458,56 @@ docker compose exec airflow-webserver airflow dags trigger decp_matching_pipelin
 
 Poll and verify as in Steps 2-3 above.
 
+**Third real, structural bug found on this re-trigger:** `resolve_and_historize`
+failed with Spark's `MERGE_CARDINALITY_VIOLATION` — "the ON search condition
+matched a single row from the target table with multiple rows of the source
+table." Root cause: `gold.decp_marches_links` (Plan 3) was keyed on `uid`
+alone, assuming one row per market. The real "groupement" (joint-award) market
+found earlier in Plan 3's Task 10 verification has *two* titulaires sharing one
+`uid`. Plan 3's own manual verification never caught this because it was the
+*first-ever* historization (gold was empty, so the MERGE's `UPDATE` branch had
+nothing to collide with) — the collision only appears on a *second* run, which
+is exactly what this orchestration plan's re-trigger constitutes against the
+already-historized real data.
+
+Fixed with a full retrofit (confirmed with the user before proceeding, given
+the scope): `resolve_decp_titulaires` (Plan 2,
+`src/registry/matching/decp_resolution.py`) now carries the original
+`titulaire_id` through unchanged alongside the derived `siret_titulaire`, and
+`gold.decp_marches_links` (Plan 3, `src/registry/matching/decp_gold_links.py`)
+is now keyed on the composite `(uid, titulaire_id)` throughout — the DDL, the
+changed-rows detection, the `MERGE INTO` ON clause, and the `INSERT`'s
+anti-join all use the pair, with null-safe `<=>` (not `=`) for `titulaire_id`
+since it can be null on some unresolved rows. A regression test
+(`test_apply_decp_links_scd2_merge_handles_joint_award_on_shared_uid`)
+reproduces the exact real scenario — two titulaires on one `uid`, historized
+twice — and passes where it previously crashed.
+
+Because the real `gold.decp_marches_links`/`silver.decp_marches_links` tables
+already existed in Garage with the old (pre-fix) schema from Plan 3's manual
+run, they needed to be dropped and let `ensure_gold_decp_links_table` recreate
+them with the new schema before re-triggering — a safe operation since this is
+this session's own experimental/rebuildable pipeline output, not externally
+authored data.
+
+- [ ] **Step 6 (added): Drop the stale-schema real tables and re-trigger once more**
+
+```bash
+uv run python -c "
+from registry.transform.spark_session import build_lakehouse_session
+spark = build_lakehouse_session()
+spark.sql('DROP TABLE IF EXISTS lakehouse.gold.decp_marches_links')
+spark.sql('DROP TABLE IF EXISTS lakehouse.silver.decp_marches_links')
+spark.stop()
+"
+docker compose exec airflow-webserver airflow dags trigger decp_matching_pipeline
+```
+
+Poll and verify as in Steps 2-3. Also confirm idempotency: trigger a *second*
+time after this one succeeds, and confirm the gold row count is unchanged
+(proving the composite-key fix actually resolves the real crash, not just the
+synthetic regression test).
+
 ---
 
 ## Self-review notes

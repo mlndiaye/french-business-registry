@@ -1,6 +1,11 @@
 """Two-branch resolution of DECP titulaires: trust the source's typed SIRET
 directly when present, otherwise unresolved. No fuzzy matching stage — see
-docs/superpowers/specs/2026-10-08-decp-procurement-design.md for why."""
+docs/superpowers/specs/2026-10-08-decp-procurement-design.md for why.
+
+The original `titulaire_id` is carried through unchanged (not just the derived
+`siret_titulaire`): a single market `uid` can carry more than one titulaire (a
+joint "groupement" award), confirmed in real department-08 data, so `uid`
+alone isn't a unique row key downstream — `(uid, titulaire_id)` is."""
 
 from __future__ import annotations
 
@@ -12,6 +17,7 @@ def resolve_decp_titulaires(decp_df: DataFrame) -> DataFrame:
     is_siret = F.col("titulaire_type_identifiant") == "SIRET"
     return decp_df.select(
         F.col("uid"),
+        F.col("titulaire_id"),
         F.when(is_siret, F.col("titulaire_id"))
         .otherwise(F.lit(None).cast("string"))
         .alias("siret_titulaire"),

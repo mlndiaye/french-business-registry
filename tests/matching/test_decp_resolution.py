@@ -48,8 +48,52 @@ def test_resolve_decp_titulaires_trusts_source_siret(spark_session):
 
     row = resolve_decp_titulaires(df).collect()[0]
 
+    assert row.titulaire_id == "98236972000015"
     assert row.siret_titulaire == "98236972000015"
     assert row.match_method == "source_siret"
+
+
+def test_resolve_decp_titulaires_keeps_both_rows_of_a_joint_award(spark_session):
+    # A real department-08 case: one market uid awarded jointly to two
+    # titulaires, one resolved and one not. uid alone can't distinguish them —
+    # titulaire_id must be carried through so downstream code has a real key.
+    df = spark_session.createDataFrame(
+        [
+            (
+                "M1",
+                "21080372200417",
+                "COMMUNE DE CHARLEVILLE-MEZIERES",
+                "68628001700035",
+                "SIRET",
+                "GABELLA S.A.",
+                "LOT No1",
+                510400.0,
+                "45110000",
+            ),
+            (
+                "M1",
+                "21080372200417",
+                "COMMUNE DE CHARLEVILLE-MEZIERES",
+                "999999999",
+                "TVA",
+                None,
+                "LOT No1",
+                510400.0,
+                "45110000",
+            ),
+        ],
+        schema=DECP_SCHEMA,
+    )
+
+    rows = resolve_decp_titulaires(df).orderBy("titulaire_id").collect()
+
+    assert len(rows) == 2
+    assert rows[0].titulaire_id == "68628001700035"
+    assert rows[0].siret_titulaire == "68628001700035"
+    assert rows[0].match_method == "source_siret"
+    assert rows[1].titulaire_id == "999999999"
+    assert rows[1].siret_titulaire is None
+    assert rows[1].match_method == "unresolved"
 
 
 def test_resolve_decp_titulaires_marks_non_siret_as_unresolved(spark_session):
