@@ -28,12 +28,16 @@ def compute_data_quality_report(validated_df: DataFrame) -> dict:
 
 
 def compute_unresolved_composition(validated_df: DataFrame, decp_df: DataFrame) -> DataFrame:
-    unresolved_ids = validated_df.filter(F.col("match_method") == "unresolved").select("uid")
-    return (
-        decp_df.join(unresolved_ids, on="uid", how="inner")
-        .groupBy("titulaire_type_identifiant")
-        .agg(
-            F.count("*").alias("count"),
-            F.sum(F.when(F.col("titulaire_nom").isNull(), 1).otherwise(0)).alias("null_nom_count"),
-        )
+    # Excluding resolved (uid, titulaire_id) pairs, rather than including rows
+    # whose uid merely appears somewhere in the unresolved set, matters because a
+    # single uid can carry multiple titulaires (a joint "groupement" award) —
+    # some resolved, some not. Matching on uid alone would let a resolved
+    # sibling leak into this unresolved breakdown.
+    resolved_pairs = validated_df.filter(F.col("match_method") == "source_siret").select(
+        F.col("uid"), F.col("siret_titulaire").alias("titulaire_id")
+    )
+    unresolved_rows = decp_df.join(resolved_pairs, on=["uid", "titulaire_id"], how="left_anti")
+    return unresolved_rows.groupBy("titulaire_type_identifiant").agg(
+        F.count("*").alias("count"),
+        F.sum(F.when(F.col("titulaire_nom").isNull(), 1).otherwise(0)).alias("null_nom_count"),
     )

@@ -14,6 +14,14 @@ VALIDATED_SCHEMA_TYPED = StructType(
         StructField("montant", DoubleType()),
     ]
 )
+DECP_SCHEMA_TYPED = StructType(
+    [
+        StructField("uid", StringType()),
+        StructField("titulaire_id", StringType()),
+        StructField("titulaire_type_identifiant", StringType()),
+        StructField("titulaire_nom", StringType()),
+    ]
+)
 
 
 def test_compute_data_quality_report_counts_resolved_and_validated(spark_session):
@@ -47,15 +55,6 @@ def test_compute_data_quality_report_handles_empty_input(spark_session):
     assert report["validated_share"] == 0.0
 
 
-DECP_SCHEMA_TYPED = StructType(
-    [
-        StructField("uid", StringType()),
-        StructField("titulaire_type_identifiant", StringType()),
-        StructField("titulaire_nom", StringType()),
-    ]
-)
-
-
 def test_compute_unresolved_composition_breaks_down_by_identifiant_type(spark_session):
     validated_df = spark_session.createDataFrame(
         [
@@ -67,9 +66,9 @@ def test_compute_unresolved_composition_breaks_down_by_identifiant_type(spark_se
     )
     decp_df = spark_session.createDataFrame(
         [
-            ("M1", "SIRET", "PRIMEURS CHAMPARDENNAIS"),
-            ("M2", "TVA", None),
-            ("M3", None, None),
+            ("M1", "98236972000015", "SIRET", "PRIMEURS CHAMPARDENNAIS"),
+            ("M2", "DE119375450", "TVA", None),
+            ("M3", None, None, None),
         ],
         schema=DECP_SCHEMA_TYPED,
     )
@@ -87,3 +86,30 @@ def test_compute_unresolved_composition_breaks_down_by_identifiant_type(spark_se
     assert result[1].titulaire_type_identifiant == "TVA"
     assert result[1]["count"] == 1
     assert result[1].null_nom_count == 1
+
+
+def test_compute_unresolved_composition_excludes_resolved_sibling_on_shared_uid(spark_session):
+    # A real case found in department-08 data: a joint award (groupement) splits
+    # one market uid across two titulaires — one resolved, one not. The resolved
+    # sibling must not leak into the unresolved composition just because it
+    # shares the same uid.
+    validated_df = spark_session.createDataFrame(
+        [
+            ("M1", "68628001700035", "source_siret", False, 510400.0),
+            ("M1", None, "unresolved", None, 510400.0),
+        ],
+        schema=VALIDATED_SCHEMA_TYPED,
+    )
+    decp_df = spark_session.createDataFrame(
+        [
+            ("M1", "68628001700035", "SIRET", "GABELLA S.A."),
+            ("M1", "999999999", "TVA", None),
+        ],
+        schema=DECP_SCHEMA_TYPED,
+    )
+
+    result = compute_unresolved_composition(validated_df, decp_df).collect()
+
+    assert len(result) == 1
+    assert result[0].titulaire_type_identifiant == "TVA"
+    assert result[0]["count"] == 1
